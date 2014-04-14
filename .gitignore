@@ -1,0 +1,9 @@
+.rspec
+.rvmrc
+/.bundle
+/log/*
+/tmp/*
+/coverage/
+/spec/tmp/*
+.project
+.DS_Store
