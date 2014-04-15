@@ -25,11 +25,6 @@ module Combi
       EM.stop_event_loop if EM.reactor_running?
     end
 
-    def restart!
-      stop!
-      start!
-    end
-
     def loop
       EventMachine.run do
         Signal.trap("INT")  { stop! }

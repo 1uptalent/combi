@@ -32,6 +32,8 @@ module Combi
     end
 
     def restart!
+      stop!
+      start!
     end
 
     def enable(services)
