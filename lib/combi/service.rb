@@ -3,8 +3,9 @@ module Combi
 
     @@actions = {}
 
-    def initialize(service_bus)
+    def initialize(service_bus, context = {})
       @service_bus = service_bus
+      @context = context
       setup_services
       register_actions
     end
@@ -37,6 +38,10 @@ module Combi
     def enable(*services, &block)
       service_bus.enable(services)
       yield block if block_given?
+    end
+
+    def context
+      @context
     end
 
   end

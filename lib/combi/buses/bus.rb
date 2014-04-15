@@ -9,10 +9,11 @@ module Combi
     def post_initialize
     end
 
-    def add_service(name)
+    def add_service(name, options = {})
       require "combi/service"
       require "service/#{name}"
-      "Service::#{name.camelize}".constantize.new(self)
+      class_name = name.split('_').map {|w| w.capitalize}.join
+      Object.const_get("Service::#{class_name}").new(self, options[:context])
     end
 
     def start!
