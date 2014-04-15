@@ -42,6 +42,8 @@ module Combi
         when :active_record
           require 'active_record'
           ActiveRecord::Base.establish_connection ConfigProvider.for(:database)
+        when :bus
+          $service_bus = Combi::ServiceBus.for(:queue)
         end
       end
     end
