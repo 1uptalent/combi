@@ -15,7 +15,7 @@ module Combi
 
       def manage_request(env, handler)
         return unless Faye::WebSocket.websocket?(env)
-        ws = Faye::WebSocket.new(env)
+        @ws = ws = Faye::WebSocket.new(env)
         session = nil
 
         ws.on :message do |event|
@@ -36,6 +36,7 @@ module Combi
       end
 
       def ws
+        @ws
       end
 
     end
@@ -70,20 +71,20 @@ module Combi
 
       def loop
         EM.run do
-          @ws = Faye::WebSocket::Client.new(@remote_api)
-          @ws.on :open do |event|
+          @ws = ws = Faye::WebSocket::Client.new(@remote_api)
+          ws.on :open do |event|
             reset_back_off_delay!
             @handler.on_open
           end
 
-          @ws.on :message do |event|
+          ws.on :message do |event|
             message = JSON.parse(event.data)
-            @bus.on_message(@ws, message)
+            @bus.on_message(ws, message)
           end
 
-          @ws.on :close do |event|
+          ws.on :close do |event|
             puts "close client web socket"
-            @ws = nil
+            @ws = ws = nil
             EM::stop_event_loop
           end
         end
@@ -149,15 +150,7 @@ module Combi
           message['payload'] ||= {}
           message['payload']['session'] = session
           response = service_instance.send(kind, message['payload'])
-          unless response.nil?
-            msg = if session
-              {success: true, status: 200, message: 'ok'}
-            else
-              message
-            end
-            msg[:result] = response
-            ws.send msg.to_json
-          end
+          #TODO: the reponse must be send to origin (when is available)
         end
       end
     end
