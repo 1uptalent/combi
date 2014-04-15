@@ -42,7 +42,19 @@ module Combi
 
     def request(name, kind, message, options = {timeout: 0.1}, &block)
       options[:routing_key] = name
-      queue_service.call(kind, message, options, &block)
+      if block.nil? || options[:async] == false
+        queue_service.call(kind, message, options, &block)
+      else
+        Thread.new do
+          begin
+            queue_service.call(kind, message, options, &block)
+          rescue => e
+            puts e.message
+            puts e.backtrace
+            retry
+          end
+        end
+      end
     end
 
     def respond_to(service_instance, handler, options)
