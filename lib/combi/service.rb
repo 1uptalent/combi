@@ -13,7 +13,7 @@ module Combi
 
     def register_actions
       actions.each do |handler|
-        service_bus.respond_to(self, handler, {})
+        service_bus.respond_to(self, handler)
       end
       fast_actions.each do |handler|
         service_bus.respond_to(self, handler, fast: true)

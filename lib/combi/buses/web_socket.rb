@@ -84,25 +84,12 @@ module Combi
       ws.rack_response
     end
 
-    def request_x(name, kind, message, options = {timeout: 0.1}, &block)
-      options[:routing_key] = name
-      queue_service.call(kind, message, options, &block)
+    def respond_to(service_instance, handler, options = {})
+      handlers[handler.to_s] = {service_instance: service_instance, options: options}
     end
 
-    def respond_to(service_instance, handler, options)
-      EventMachine.next_tick do
-        queue_options = {}
-        subscription_options = {}
-        if options[:fast] == true
-          queue_options[:auto_delete] = false
-        else
-          subscription_options[:ack] = true
-        end
-        queue_service.queue(handler.to_s, queue_options).subscribe(subscription_options) do |delivery_info, payload|
-          respond service_instance, payload, delivery_info
-          queue_service.acknowledge delivery_info unless options[:fast] == true
-        end
-      end
+    def handlers
+      @handlers ||= {}
     end
 
     def respond(service_instance, request, delivery_info)

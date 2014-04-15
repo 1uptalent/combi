@@ -13,7 +13,7 @@ module Combi
       block.call response
     end
 
-    def respond_to(service_instance, handler, options)
+    def respond_to(service_instance, handler, options = {})
       memory_handlers[handler.to_s] = {service_instance: service_instance, options: options}
     end
 

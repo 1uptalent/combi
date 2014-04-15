@@ -57,7 +57,7 @@ module Combi
       end
     end
 
-    def respond_to(service_instance, handler, options)
+    def respond_to(service_instance, handler, options = {})
       EventMachine.next_tick do
         queue_options = {}
         subscription_options = {}
