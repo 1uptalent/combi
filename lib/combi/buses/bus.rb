@@ -25,9 +25,6 @@ module Combi
     def start!
     end
 
-    def loop
-    end
-
     def stop!
     end
 
