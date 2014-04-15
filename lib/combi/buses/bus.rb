@@ -1,3 +1,5 @@
+require "combi/service"
+
 module Combi
   class Bus
 
@@ -9,11 +11,15 @@ module Combi
     def post_initialize
     end
 
-    def add_service(name, options = {})
-      require "combi/service"
-      require "service/#{name}"
-      class_name = name.split('_').map {|w| w.capitalize}.join
-      Object.const_get("Service::#{class_name}").new(self, options[:context])
+    def add_service(service_definition, options = {})
+      service_class = if service_definition.is_a?(Module)
+        Combi::Service
+      else
+        require "service/#{service_definition}"
+        class_name = service_definition.split('_').map {|w| w.capitalize}.join
+        Object.const_get("Service::#{class_name}")
+      end
+      service_class.new(self, options[:context], service_definition)
     end
 
     def start!

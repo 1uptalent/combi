@@ -1,11 +1,22 @@
 module Combi
   class Service
 
-    def initialize(service_bus, context = {})
-      @service_bus = service_bus
-      @context = context
+    def initialize(service_bus, context, service_definition = nil)
+      context ||= {}
+      context[:service_bus] = service_bus
+      extend service_definition if service_definition.is_a?(Module)
+      setup_context(context)
       setup_services
       register_actions
+    end
+
+    def setup_context(context)
+      @context = context
+      @context.keys.each do |context_var|
+        define_singleton_method context_var do
+          @context[context_var]
+        end
+      end
     end
 
     def setup_services
@@ -43,10 +54,6 @@ module Combi
     def enable(*services, &block)
       service_bus.enable(services)
       yield block if block_given?
-    end
-
-    def context
-      @context
     end
 
   end
