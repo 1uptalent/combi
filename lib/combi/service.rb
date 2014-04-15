@@ -1,8 +1,6 @@
 module Combi
   class Service
 
-    @@actions = {}
-
     def initialize(service_bus, context = {})
       @service_bus = service_bus
       @context = context
@@ -14,8 +12,11 @@ module Combi
     end
 
     def register_actions
-      @@actions.each do |handler, options|
-        service_bus.respond_to self, handler, options
+      actions.each do |handler|
+        service_bus.respond_to(self, handler, {})
+      end
+      fast_actions.each do |handler|
+        service_bus.respond_to(self, handler, fast: true)
       end
     end
 
@@ -27,8 +28,12 @@ module Combi
       lambda &block
     end
 
-    def self.respond_to(handler, options = {})
-      @@actions[handler] = options
+    def actions
+      []
+    end
+
+    def fast_actions
+      []
     end
 
     def service_bus
