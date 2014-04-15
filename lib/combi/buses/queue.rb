@@ -1,11 +1,12 @@
+require 'combi/queue_service'
+
 module Combi
   class Queue < Bus
 
     def post_initialize
       unless @options[:init_queue] == false
-        require 'queue_service'
         EventMachine.next_tick do
-          QueueService.start(ConfigProvider.for(:amqp), rpc: :enabled)
+          Combi::QueueService.start(@options[:amqp_config], rpc: :enabled)
         end
       end
     end
@@ -84,7 +85,7 @@ module Combi
     end
 
     def queue_service
-      @@queue_service ||= QueueService.instance
+      @@queue_service ||= Combi::QueueService.instance
     end
 
   end

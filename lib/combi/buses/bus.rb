@@ -34,7 +34,7 @@ module Combi
         when :queue
           require 'queue_service'
           EventMachine.next_tick do
-            QueueService.start ConfigProvider.for(:amqp)
+            Combi::QueueService.start ConfigProvider.for(:amqp)
           end
         when :redis
           require 'redis'
