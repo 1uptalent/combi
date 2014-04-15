@@ -12,14 +12,16 @@ module Combi
     end
 
     def add_service(service_definition, options = {})
-      service_class = if service_definition.is_a?(Module)
-        Combi::Service
+      service = if service_definition.is_a?(Module)
+        service = Object.new
+        service.extend Combi::Service
+        service.extend service_definition
       else
         require "service/#{service_definition}"
         class_name = service_definition.split('_').map {|w| w.capitalize}.join
-        Object.const_get("Service::#{class_name}")
+        Object.const_get("Service::#{class_name}").new
       end
-      service_class.new(self, options[:context], service_definition)
+      service.setup(self, options[:context])
     end
 
     def start!

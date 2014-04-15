@@ -1,10 +1,9 @@
 module Combi
-  class Service
+  module Service
 
-    def initialize(service_bus, context, service_definition = nil)
+    def setup(service_bus, context)
       context ||= {}
       context[:service_bus] = service_bus
-      extend service_definition if service_definition.is_a?(Module)
       setup_context(context)
       setup_services
       register_actions
