@@ -1,8 +1,13 @@
 module Combi
   class WebSocket < Bus
 
+    RPC_DEFAULT_TIMEOUT = 1
+    RPC_WAIT_PERIOD = 0.1
+
+
     def post_initialize
       require 'faye/websocket'
+      @rpc_responses = {}
       @remote_api = @options[:remote_api]
       if @remote_api
         @handler = @options[:handler]
@@ -12,6 +17,7 @@ module Combi
 
     def start!
       @stop_requested = false
+      reset_back_off_delay!
       until stop_requested?
         loop
         back_off! unless stop_requested?
@@ -39,11 +45,7 @@ module Combi
 
         @ws.on :message do |event|
           message = JSON.parse(event.data)
-          if is_response?(message)
-            @handler.handle_response(message)
-          else
-            @handler.handle_command(message)
-          end
+          on_message(@ws, message)
         end
 
         @ws.on :close do |event|
@@ -58,18 +60,40 @@ module Combi
       @stop_requested
     end
 
-    def send(payload)
-      return unless @ws
-      @ws.send payload
+    def on_message(ws, message, session = nil)
+      if message['correlation_id']
+        @rpc_responses[message['correlation_id']] = [message]
+      end
+      service_name = message['service']
+      handler = handlers[service_name.to_s]
+      if handler
+        service_instance = handler[:service_instance]
+        kind = message['kind']
+        if service_instance.respond_to? kind
+          message['payload'] ||= {}
+          message['payload']['session'] = session
+          response = service_instance.send(kind, message['payload'])
+          unless response.nil?
+            msg = if session
+              {success: true, status: 200, message: 'ok'}
+            else
+              message
+            end
+            msg[:result] = response
+            ws.send msg.to_json
+          end
+        end
+      end
     end
 
-    def request(env, handler)
+    def manage_request(env, handler)
       return unless Faye::WebSocket.websocket?(env)
       ws = Faye::WebSocket.new(env)
       session = nil
 
       ws.on :message do |event|
-        session.process JSON.parse(event.data)
+        message = JSON.parse(event.data)
+        on_message(ws, message, session)
       end
 
       ws.on :open do |event|
@@ -92,14 +116,37 @@ module Combi
       @handlers ||= {}
     end
 
-    def respond(service_instance, request, delivery_info)
-      message = JSON.parse request
-      kind = message['kind']
-      payload = message['payload']
-      options = message['options']
-      return unless service_instance.respond_to?(kind)
-      response = service_instance.send(kind, payload)
-      queue_service.respond(response, delivery_info) unless response.nil?
+    def request(name, kind, message, options = {}, &block)
+      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
+      msg = {
+        service: name,
+        kind: kind,
+        payload: message
+      }
+      unless block.nil?
+        correlation_id = rand(10_000_000).to_s
+        msg[:correlation_id] = correlation_id unless block.nil?
+      end
+      web_socket = @ws || options[:ws]
+      Thread.new do
+        begin
+          web_socket.send msg.to_json
+        rescue => e
+          puts e.message
+          puts e.backtrace
+          retry
+        end
+      end
+      return if block.nil?
+      elapsed = 0
+      args = @rpc_responses[correlation_id]
+      while(args.nil? && elapsed < options[:timeout]) do
+        sleep(RPC_WAIT_PERIOD)
+        elapsed += RPC_WAIT_PERIOD
+        args = @rpc_responses[correlation_id]
+      end
+      args ||= [nil, {error: 'timeout'}]
+      block.call(*args) unless block.nil?
     end
 
     protected
@@ -111,10 +158,6 @@ module Combi
     def back_off!
       sleep @back_off_delay
       @back_off_delay = [@back_off_delay * 2, 300].min
-    end
-
-    def is_response?(data)
-      data.has_key? 'success'
     end
 
   end
