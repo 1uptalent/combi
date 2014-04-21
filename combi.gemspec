@@ -11,4 +11,5 @@ Gem::Specification.new do |s|
   s.files       = ["lib/combi.rb"]
   s.homepage    = 'http://rubygems.org/gems/combi'
   s.license     = 'MIT'
+  s.add_development_dependency 'rspec-given', '~> 3.5.4'
 end
