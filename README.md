@@ -1,7 +1,7 @@
-combi
-=====
+combi: A mini bus for micro services
+====================================
 
-A mini bus (search `combi` in google images) for micro services
+![A Volkswagen Combi](http://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Volkswagen-rapunzel.jpg/640px-Volkswagen-rapunzel.jpg)
 
 ## Disclaimer
 
