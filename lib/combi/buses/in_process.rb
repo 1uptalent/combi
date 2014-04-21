@@ -8,7 +8,6 @@ module Combi
       return if handler.nil?
       service_instance = handler[:service_instance]
       message = JSON.parse(message) if message.is_a?(String)
-      message = HashWithIndifferentAccess.new(message)
       return unless service_instance.respond_to?(kind)
       response = service_instance.send(kind, message)
       response = response.call if response.is_a?(Proc)
