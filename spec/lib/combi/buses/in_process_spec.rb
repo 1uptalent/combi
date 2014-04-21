@@ -10,19 +10,19 @@ describe 'Combi::InProcess' do
   end
 
   Given(:subject) { Combi::ServiceBus.init_for(:in_process, {}) }
+  Given(:boring_salutation_service) do
+    Module.new do
+      def actions
+        [:say_hello]
+      end
 
-  context 'can register services' do
-    Given(:boring_salutation_service) do
-      Module.new do
-        def actions
-          [:say_hello]
-        end
-
-        def do_it(params)
-          "Hello #{params['who']}"
-        end
+      def do_it(params)
+        "Hello #{params['who']}"
       end
     end
+  end
+
+  context 'can invoke services' do
     When(:service) { subject.add_service boring_salutation_service }
     When(:params) { { who: 'world' } }
     Then do 

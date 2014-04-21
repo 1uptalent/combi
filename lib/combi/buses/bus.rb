@@ -4,9 +4,11 @@ require 'yajl/json_gem' # for object.to_json, JSON.parse, etc...
 
 module Combi
   class Bus
+    attr_reader :services
 
     def initialize(options)
       @options = options
+      @services = []
       post_initialize
     end
 
@@ -14,16 +16,9 @@ module Combi
     end
 
     def add_service(service_definition, options = {})
-      service = if service_definition.is_a?(Module)
-        service = Object.new
-        service.extend Combi::Service
-        service.extend service_definition
-      else
-        require "service/#{service_definition}"
-        class_name = service_definition.split('_').map {|w| w.capitalize}.join
-        Object.const_get("Service::#{class_name}").new
-      end
+      service = make_service_instance(service_definition)
       service.setup(self, options[:context])
+      @services << service
     end
 
     def start!
@@ -57,5 +52,22 @@ module Combi
       end
     end
 
+    protected
+
+    def make_service_instance(service_definition)
+      if Combi::Service === service_definition
+        service = service_definition 
+      else
+        service = create_service_from_module(service_definition)
+      end
+    end
+
+    def create_service_from_module(a_module)
+      service_class = Class.new do
+        include Combi::Service
+        include a_module  
+      end
+      service = service_class.new
+    end
   end
 end
