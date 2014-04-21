@@ -1,3 +1,4 @@
+require 'combi/buses/bus'
 require 'combi/queue_service'
 
 module Combi

@@ -1,3 +1,5 @@
+require 'combi/buses/bus'
+
 module Combi
   class WebSocket < Bus
 

@@ -11,5 +11,8 @@ Gem::Specification.new do |s|
   s.files       = ["lib/combi.rb"]
   s.homepage    = 'http://rubygems.org/gems/combi'
   s.license     = 'MIT'
+  s.add_dependency 'yajl-ruby', '~> 1.2.0'
   s.add_development_dependency 'rspec-given', '~> 3.5.4'
+  s.add_development_dependency 'amqp', '~> 1.3.0'
+  s.add_development_dependency 'faye-websocket', '~> 0.7.2'
 end

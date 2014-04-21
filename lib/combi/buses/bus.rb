@@ -1,4 +1,6 @@
 require "combi/service"
+require 'yajl'
+require 'yajl/json_gem' # for object.to_json, JSON.parse, etc...
 
 module Combi
   class Bus
