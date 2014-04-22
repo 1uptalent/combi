@@ -171,7 +171,7 @@ module Combi
       }
       unless block.nil?
         correlation_id = rand(10_000_000).to_s
-        msg[:correlation_id] = correlation_id unless block.nil?
+        msg[:correlation_id] = correlation_id
       end
       web_socket = @machine.ws || options[:ws]
       Thread.new do
