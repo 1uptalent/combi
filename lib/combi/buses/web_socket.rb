@@ -113,9 +113,6 @@ module Combi
 
     end
 
-    RPC_DEFAULT_TIMEOUT = 1
-    RPC_WAIT_PERIOD = 0.1
-
     def post_initialize
       require 'faye/websocket'
       @rpc_responses = {}

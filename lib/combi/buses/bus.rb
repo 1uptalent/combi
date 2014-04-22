@@ -6,6 +6,9 @@ module Combi
   class Bus
     attr_reader :services
 
+    RPC_DEFAULT_TIMEOUT = 1
+    RPC_WAIT_PERIOD = 0.1
+
     def initialize(options)
       @options = options
       @services = []
