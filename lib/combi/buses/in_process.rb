@@ -3,12 +3,12 @@ require 'combi/buses/bus'
 module Combi
   class InProcess < Bus
 
-    def request(handler, kind, message, options = {}, &block)
+    def request(handler_name, kind, message, options = {}, &block)
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      handler = memory_handlers[handler.to_s]
+      handler = memory_handlers[handler_name.to_s]
       return if handler.nil?
       service_instance = handler[:service_instance]
-      message = JSON.parse(message) if message.is_a?(String)
+      message = JSON.parse(message.to_json)
       return unless service_instance.respond_to?(kind)
       Timeout.timeout(options[:timeout]) do
         response = service_instance.send(kind, message)

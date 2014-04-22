@@ -30,7 +30,7 @@ module Combi
         end
 
         ws.on :close do |event|
-          session.close
+          session && session.close
         end
 
         # Return async Rack response
@@ -72,6 +72,12 @@ module Combi
       end
 
       def loop
+        EM.error_handler do |error|
+          puts "\tERROR"
+          puts "\t#{error.inspect}"
+          puts error.backtrace
+        end
+
         EM.run do
           @ws = ws = Faye::WebSocket::Client.new(@remote_api)
           ws.on :open do |event|
@@ -138,7 +144,7 @@ module Combi
 
     def on_message(ws, message, session = nil)
       if message['correlation_id']
-        @rpc_responses[message['correlation_id']] = [message]
+        @rpc_responses[message['correlation_id']] = message
       end
       service_name = message['service']
       handler = handlers[service_name.to_s]
@@ -149,7 +155,7 @@ module Combi
           message['payload'] ||= {}
           message['payload']['session'] = session
           response = service_instance.send(kind, message['payload'])
-          #TODO: the reponse must be send to origin (when is available)
+          ws.send({result: 'ok', correlation_id: message['correlation_id'], response: response}.to_json)
         end
       end
     end
@@ -174,6 +180,7 @@ module Combi
         msg[:correlation_id] = correlation_id
       end
       web_socket = @machine.ws || options[:ws]
+      raise "Websocket is nil" unless web_socket
       Thread.new do
         begin
           web_socket.send msg.to_json
@@ -185,14 +192,18 @@ module Combi
       end
       return if block.nil?
       elapsed = 0
-      args = @rpc_responses[correlation_id]
-      while(args.nil? && elapsed < options[:timeout]) do
-        sleep(RPC_WAIT_PERIOD)
-        elapsed += RPC_WAIT_PERIOD
-        args = @rpc_responses[correlation_id]
+      raw_response = @rpc_responses[correlation_id]
+      poll_time = options[:timeout] / RPC_MAX_POLLS
+      while(raw_response.nil? && elapsed < options[:timeout]) do
+        sleep(poll_time)
+        elapsed += poll_time
+        raw_response = @rpc_responses[correlation_id]
       end
-      args ||= [nil, {error: 'timeout'}]
-      block.call(*args) unless block.nil?
+      if raw_response == nil && elapsed >= options[:timeout]
+        raise Timeout::Error
+      else
+        block.call(raw_response['response']) unless block.nil?
+      end
     end
 
   end

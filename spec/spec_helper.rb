@@ -17,3 +17,5 @@ RSpec.configure do |config|
 end
 
 require 'rspec-given'
+Dir["./spec/support/**/*.rb"].sort.each {|f| require f}
+Dir["./spec/shared_examples/**/*.rb"].sort.each {|f| require f}

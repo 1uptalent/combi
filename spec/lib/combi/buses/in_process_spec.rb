@@ -1,5 +1,4 @@
 require 'spec_helper'
-require 'shared_examples/standard_bus'
 
 require 'combi/service_bus'
 require 'combi/buses/in_process'
@@ -12,5 +11,8 @@ describe 'Combi::InProcess' do
 
   Given(:subject) { Combi::ServiceBus.init_for(:in_process, {}) }
 
-  it_behaves_like 'standard_bus'
+  it_behaves_like 'standard_bus' do
+    Given(:provider) { subject }
+    Given(:consumer) { subject }
+  end
 end
