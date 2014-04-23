@@ -20,6 +20,9 @@ module Combi
         when :web_socket
           require 'combi/buses/web_socket'
           Combi::WebSocket.new(options)
+        when :http
+          require 'combi/buses/http'
+          Combi::Http.new(options)
         end
       end
     end
