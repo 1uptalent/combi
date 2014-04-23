@@ -23,7 +23,7 @@ shared_examples_for "standard_bus" do
     true
   }
 
-  Given(:consumer_started) { 
+  Given(:consumer_started) {
     Thread.new { consumer.start! }
     sleep 0.1
     true
@@ -32,7 +32,7 @@ shared_examples_for "standard_bus" do
   context 'can invoke services' do
     When(:service) { provider.add_service boring_salutation_service }
     When(:params) { { who: 'world' } }
-    Then do 
+    Then do
       service_result = nil
       consumer.request(:say_hello, :do_it, params) do |result|
         service_result = result
