@@ -18,7 +18,8 @@ shared_examples_for "standard_bus" do
   end
 
   Given(:provider_started) {
-    provider.start!
+    Thread.new { provider.start! }
+    sleep 0.5
     true
   }
 

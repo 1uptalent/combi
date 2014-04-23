@@ -63,7 +63,7 @@ module Combi
       @rpc_responses = {}
       @rpc_queue = queue('', exclusive: true, auto_delete: true) do |rpc_queue|
         rpc_queue.subscribe do |header, response|
-          @rpc_responses[header.correlation_id] = [response, header]
+          @rpc_responses[header.correlation_id] = { 'response' => response, 'amqp_header' => header }
         end
       end
     end
@@ -81,14 +81,18 @@ module Combi
       publish(request, routing_key: options[:routing_key], reply_to: reply_to, correlation_id: correlation_id)
       return if block.nil?
       elapsed = 0
-      args = @rpc_responses[correlation_id]
-      while(args.nil? && elapsed < options[:timeout]) do
-        sleep(RPC_WAIT_PERIOD)
-        elapsed += RPC_WAIT_PERIOD
-        args = @rpc_responses[correlation_id]
+      raw_response = @rpc_responses[correlation_id]
+      poll_time = options[:timeout] / Combi::Bus::RPC_MAX_POLLS
+      while(raw_response.nil? && elapsed < options[:timeout]) do
+        sleep(poll_time)
+        elapsed += poll_time
+        raw_response = @rpc_responses[correlation_id]
       end
-      args ||= [nil, {error: 'timeout'}]
-      block.call(*args)
+      if raw_response.nil? && elapsed >= options[:timeout]
+        raise Timeout::Error
+      else
+        block.call(raw_response['response']) unless block.nil?
+      end
     end
   end
 end

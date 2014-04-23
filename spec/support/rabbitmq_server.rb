@@ -7,8 +7,32 @@ class RabbitmqServer
   PASSWORD='testpass'
 
   def start!
-    stop! # make sure
-    system "docker run -d -P -e RABBITMQ_PASS=#{PASSWORD} -name #{NAME} tutum/rabbitmq"
+    needs_to_start = !container_running?
+    if needs_to_start
+      puts "Starting new Rabbitmq container"
+      system "docker run -d -P -e RABBITMQ_PASS=#{PASSWORD} -name #{NAME} tutum/rabbitmq"
+      puts "RABBITMQ STARTING"
+      sleep 1
+    end
+    start_forwarder!
+    return needs_to_start
+  end
+
+  def stop!
+    system "docker stop --time 0 #{NAME}" if container_running?
+    system "docker rm #{NAME}" if container_exists?
+    stop_forwarder!
+  end
+
+  def start_forwarder!
+    @forwarder_pid = Process.spawn '/usr/local/bin/boot2docker', 'ssh', '-L',  "#{port}:localhost:#{port}", '-N'
+    Process.detach @forwarder_pid
+  end
+
+  def stop_forwarder!
+    Process.kill 'TERM', @forwarder_pid if @forwarder_pid
+  rescue Error::ESRCH => e
+    # the forwarder process has already died
   end
 
   def port
@@ -23,8 +47,12 @@ class RabbitmqServer
     end
   end
 
-  def stop!
-    system "docker stop --time 0 #{NAME}" if `docker ps | grep #{NAME}`.length > 0
-    system "docker rm #{NAME}" if `docker ps -a | grep #{NAME}`.length > 0
+
+  def container_running?
+    `docker ps | grep #{NAME}`.length > 0
+  end
+
+  def container_exists?
+    `docker ps -a | grep #{NAME}`.length > 0
   end
 end

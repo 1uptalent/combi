@@ -42,14 +42,15 @@ module Combi
       if block.nil? || options[:async] == false
         queue_service.call(kind, message, options, &block)
       else
-        Thread.new do
-          begin
-            queue_service.call(kind, message, options, &block)
-          rescue => e
-            puts e.message
-            puts e.backtrace
-            retry
-          end
+        begin
+          queue_service.call(kind, message, options, &block)
+        rescue Timeout::Error => e
+          raise
+        rescue => e
+          puts "ERROR!!!"
+          puts e.message
+          puts e.backtrace
+          retry
         end
       end
     end
