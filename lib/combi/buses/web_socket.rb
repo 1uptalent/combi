@@ -15,26 +15,17 @@ module Combi
       def stop!
       end
 
-      def manage_request(env, handler)
-        return unless Faye::WebSocket.websocket?(env)
-        @ws = ws = Faye::WebSocket.new(env)
-        session = nil
+      def on_open(ws, handler)
+        handler.new_session(ws)
+      end
 
-        ws.on :message do |event|
-          message = JSON.parse(event.data)
-          @bus.on_message(ws, message, session)
-        end
+      def on_message(ws, session, raw_message)
+        message = JSON.parse(raw_message)
+        @bus.on_message(ws, message, session)
+      end
 
-        ws.on :open do |event|
-          session = handler.new_session(ws)
-        end
-
-        ws.on :close do |event|
-          session && session.close
-        end
-
-        # Return async Rack response
-        ws.rack_response
+      def on_close(session)
+        session && session.close
       end
 
       def ws
@@ -72,6 +63,8 @@ module Combi
       end
 
       def loop
+        require 'faye/websocket'
+
         EM.error_handler do |error|
           puts "\tERROR"
           puts "\t#{error.inspect}"
@@ -120,7 +113,6 @@ module Combi
     end
 
     def post_initialize
-      require 'faye/websocket'
       @rpc_responses = {}
       if @options[:remote_api]
         require 'eventmachine'
@@ -139,7 +131,41 @@ module Combi
     end
 
     def manage_request(env, handler)
-      @machine.manage_request(env, handler)
+      require 'faye/websocket'
+
+      return unless Faye::WebSocket.websocket?(env)
+      @ws = ws = Faye::WebSocket.new(env)
+      session = nil
+
+      ws.on :message do |event|
+        @machine.on_message(ws, session, event.data)
+      end
+
+      ws.on :open do |event|
+        session = @machine.on_open(ws, handler)
+      end
+
+      ws.on :close do |event|
+        @machine.on_close(session)
+      end
+      # Return async Rack response
+      ws.rack_response
+    end
+
+    def manage_ws_event(ws, handler)
+      session = nil
+
+      ws.onmessage do |raw_message|
+        @machine.on_message(ws, session, raw_message)
+      end
+
+      ws.onopen do |handshake|
+        session = @machine.on_open(ws, handler)
+      end
+
+      ws.onclose do
+        @machine.on_close(session)
+      end
     end
 
     def on_message(ws, message, session = nil)
