@@ -8,7 +8,7 @@ module Combi
     RPC_WAIT_PERIOD = 0.01
 
     class << self
-      def start(config = CONFIG_AMQP, options = {})
+      def start(config, options = {})
         $stdout.sync = true
         EM.error_handler do |error|
           puts "\tERROR"
