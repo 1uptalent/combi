@@ -15,10 +15,6 @@ describe 'Combi::WebSocket' do
   end
   Given(:ws_server) { Combi::ServiceBus.init_for(:web_socket, {} )}
   Given(:subject) { Combi::ServiceBus.init_for(:web_socket, client_options) }
-  Given!("webserver is running") do
-    # TODO: poll the server
-    sleep 1
-  end
 
   it_behaves_like 'standard_bus' do
     Given(:provider) { ws_server }
@@ -28,7 +24,7 @@ describe 'Combi::WebSocket' do
       start_websocket_server ws_server
     end
     Given!("consumer started") do
-      webserver && provider_started && sleep(1) && consumer_started
+      webserver && provider_started && consumer_started
     end
     after :each do
       stop_websocket_server(webserver)
