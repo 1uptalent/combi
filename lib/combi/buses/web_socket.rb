@@ -85,7 +85,7 @@ module Combi
 
         ws.on :error do |event|
           @bus.log  "received error: #{event.inspect}"
-          close!
+          stop!
           back_off!
         end
       end
