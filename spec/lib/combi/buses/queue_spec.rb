@@ -22,14 +22,14 @@ describe 'Combi::Queue' do
     }
   end
   it_behaves_like 'standard_bus' do
-    before(:all) { 
+    before(:all) {
       RabbitmqServer.instance.stop! if ENV['CLEAN']
-      if RabbitmqServer.instance.start! 
+      if RabbitmqServer.instance.start!
         puts "Giving time to rabbitmq"
         sleep 1
       end
     }
-    after(:all) { 
+    after(:all) {
       RabbitmqServer.instance.stop! if ENV['CLEAN']
     }
     Given(:provider) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config } ) }

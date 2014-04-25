@@ -8,10 +8,8 @@ describe 'Combi::Http' do
     When(:bus) { Combi::ServiceBus.init_for(:http, {}) }
     Then { Combi::Http === bus }
   end
-  Given(:handler) { double('handler', on_open: nil) }
   Given(:client_options) do
-    { remote_api: 'http://localhost:9292/',
-      handler: handler }
+    { remote_api: 'http://localhost:9292/' }
   end
   Given(:http_server) { Combi::ServiceBus.init_for(:http, {} )}
   Given(:subject) { Combi::ServiceBus.init_for(:http, client_options) }
