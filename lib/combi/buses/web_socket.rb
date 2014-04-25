@@ -16,10 +16,12 @@ module Combi
       end
 
       def on_open(ws, handler)
+        @bus.log "ON OPEN #{handler.inspect}"
         handler.new_session(ws)
       end
 
       def on_message(ws, session, raw_message)
+        @bus.log "ON MESSAGE #{raw_message}"
         message = JSON.parse(raw_message)
         @bus.on_message(ws, message, session)
       end
@@ -35,6 +37,7 @@ module Combi
     end
 
     class Client
+      require 'faye/websocket'
 
       def initialize(remote_api, handler, bus)
         @handler = handler
@@ -45,16 +48,13 @@ module Combi
       def start!
         @stop_requested = false
         reset_back_off_delay!
-        until stop_requested?
-          loop
-          back_off! unless stop_requested?
-        end
+        open_websocket
       end
 
       def stop!
         @stop_requested = true
-        puts "stop requested"
-        EM.stop_event_loop if EM.reactor_running?
+        @ws && @ws.close
+        @bus.log "stop requested"
       end
 
       def restart!
@@ -62,36 +62,36 @@ module Combi
         start!
       end
 
-      def loop
-        require 'faye/websocket'
-
-        EM.error_handler do |error|
-          puts "\tERROR"
-          puts "\t#{error.inspect}"
-          puts error.backtrace
+      def open_websocket
+        @bus.log  @remote_api
+        @ws = ws = Faye::WebSocket::Client.new(@remote_api)
+        ws.on :open do |event|
+          @bus.log "OPEN"
+          reset_back_off_delay!
+          @bus.log "HANDLER #{@handler.inspect}"
+          @handler.on_open
         end
 
-        EM.run do
-          @ws = ws = Faye::WebSocket::Client.new(@remote_api)
-          ws.on :open do |event|
-            reset_back_off_delay!
-            @handler.on_open
-          end
+        ws.on :message do |event|
+          @bus.log "ON MESSAGE: #{event.data}"
+          message = JSON.parse(event.data)
+          @bus.on_message(ws, message)
+        end
 
-          ws.on :message do |event|
-            message = JSON.parse(event.data)
-            @bus.on_message(ws, message)
-          end
+        ws.on :close do |event|
+          @bus.log  "close #{event.code}: #{event.reason}"
+          @ws = ws = nil
+        end
 
-          ws.on :close do |event|
-            puts "close client web socket"
-            @ws = ws = nil
-            EM::stop_event_loop
-          end
+        ws.on :error do |event|
+          @bus.log  "received error: #{event.inspect}"
+          stop!
+          back_off!
         end
       end
 
       def ws
+        @bus.log "ws present: #{@ws != nil}"
         @ws
       end
 
@@ -106,10 +106,20 @@ module Combi
       end
 
       def back_off!
-        sleep @back_off_delay
-        @back_off_delay = [@back_off_delay * 2, 300].min
+        puts "Backing off for #{@back_off_delay} seconds"
+        EM::add_timer @back_off_delay do
+          @back_off_delay = [@back_off_delay * 2, 300].min
+          open_websocket
+        end
       end
 
+    end
+
+    attr_reader :handlers
+
+    def initialize(options)
+      super
+      @handlers = {}
     end
 
     def post_initialize
@@ -168,30 +178,44 @@ module Combi
       end
     end
 
+    def log(message)
+      puts "#{object_id} #{@machine.class.name} #{message}"
+    end
+
     def on_message(ws, message, session = nil)
-      if message['correlation_id']
+      if message['correlation_id'] && message.has_key?('result')
         @rpc_responses[message['correlation_id']] = message
+        log "Stored message with correlation_id #{message['correlation_id']} - #{message.inspect}"
       end
       service_name = message['service']
+      kind = message['kind']
+      payload = message['payload'] || {}
+      payload['session'] = session
+      response = invoke_service(service_name, kind, payload)
+      ws.send({result: 'ok',
+               correlation_id: message['correlation_id'],
+               response: response}.to_json) if response != nil
+    end
+
+    def invoke_service(service_name, kind, payload)
       handler = handlers[service_name.to_s]
       if handler
         service_instance = handler[:service_instance]
-        kind = message['kind']
         if service_instance.respond_to? kind
-          message['payload'] ||= {}
-          message['payload']['session'] = session
-          response = service_instance.send(kind, message['payload'])
-          ws.send({result: 'ok', correlation_id: message['correlation_id'], response: response}.to_json)
+          response = service_instance.send(kind, payload)
+        else
+          log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
         end
+      else
+        log "[WARNING] Service #{service_name} not found"
+        log "[WARNING] handlers: #{handlers.keys.inspect}"
       end
     end
 
     def respond_to(service_instance, handler, options = {})
+      log "registering #{handler}"
       handlers[handler.to_s] = {service_instance: service_instance, options: options}
-    end
-
-    def handlers
-      @handlers ||= {}
+      log "handlers: #{handlers.keys.inspect}"
     end
 
     def request(name, kind, message, options = {}, &block)
@@ -207,19 +231,12 @@ module Combi
       end
       web_socket = @machine.ws || options[:ws]
       raise "Websocket is nil" unless web_socket
-      Thread.new do
-        begin
-          web_socket.send msg.to_json
-        rescue => e
-          puts e.message
-          puts e.backtrace
-          retry
-        end
-      end
+      log "sending request #{msg.inspect}"
+      web_socket.send msg.to_json
       return if block.nil?
       elapsed = 0
       raw_response = @rpc_responses[correlation_id]
-      poll_time = options[:timeout] / RPC_MAX_POLLS
+      poll_time = options[:timeout].fdiv RPC_MAX_POLLS
       while(raw_response.nil? && elapsed < options[:timeout]) do
         sleep(poll_time)
         elapsed += poll_time
@@ -228,7 +245,7 @@ module Combi
       if raw_response == nil && elapsed >= options[:timeout]
         raise Timeout::Error
       else
-        block.call(raw_response['response']) unless block.nil?
+        block.call(raw_response['response'])
       end
     end
 

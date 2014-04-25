@@ -8,27 +8,32 @@ describe 'Combi::WebSocket' do
     When(:bus) { Combi::ServiceBus.init_for(:web_socket, {}) }
     Then { Combi::WebSocket === bus }
   end
-  Given(:handler) { double('handler', on_open: nil) }
+  Given(:handler) do
+    Class.new do
+      def on_open; end
+    end.new
+  end
+  # Workaround to random errors because the port is in use
+  # My guess (amuino): Tests are too fast/closing the servers is slow
+  Given(:server_port) { 9292 + rand(30000) }
   Given(:client_options) do
-    { remote_api: 'ws://localhost:9292/',
+    { remote_api: "ws://localhost:#{server_port}/",
       handler: handler }
   end
-  Given(:ws_server) { Combi::ServiceBus.init_for(:web_socket, {} )}
-  Given(:subject) { Combi::ServiceBus.init_for(:web_socket, client_options) }
+  Given(:provider) { Combi::ServiceBus.init_for(:web_socket, {} )}
+  Given(:consumer) { Combi::ServiceBus.init_for(:web_socket, client_options) }
 
   it_behaves_like 'standard_bus' do
-    Given(:provider) { ws_server }
-    Given(:consumer) { subject }
-    Given(:webserver) do
-      puts "Running webserver with #{service.map(&:actions).join ','} registered"
-      start_websocket_server ws_server
-    end
+    before(:each) { start_background_reactor }
+
+    Given(:webserver) { start_em_websocket_server provider, server_port }
     Given!("consumer started") do
-      webserver && provider_started && consumer_started
+      provider_started && webserver && consumer_started
     end
-    after :each do
-      stop_websocket_server(webserver)
+
+    after(:each) do
+      consumer.stop!
+      stop_background_reactor
     end
   end
-
 end

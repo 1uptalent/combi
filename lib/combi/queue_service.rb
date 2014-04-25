@@ -7,32 +7,36 @@ module Combi
     RPC_DEFAULT_TIMEOUT = 1
     RPC_WAIT_PERIOD = 0.01
 
-    class << self
-      def start(config, options = {})
-        $stdout.sync = true
-        EM.error_handler do |error|
-          puts "\tERROR"
-          puts "\t#{error.inspect}"
-          puts error.backtrace
+    def initialize(config, options)
+      @response_store = ResponseStore.new
+      @rpc_queue = nil
+      @ready = false
+      EM::next_tick do
+        connect config do
+          if options[:rpc] == :enabled
+            create_rpc_queue
+          else
+            @ready = true
+          end
         end
-        instance.connect config
-        @rpc_queue = nil
-        instance.create_rpc_queue if options[:rpc] == :enabled
-      end
-
-      def instance
-        @@instance ||= self.new
       end
     end
 
-    def connect(config)
-      @amqp_conn = AMQP.connect(config)
-      @amqp_conn.on_error do |conn, conn_close|
-        puts "error in connection to rabbit mq"
+    def ready?
+      @ready
+    end
+
+    def log(message)
+      puts "#{object_id} #{self.class.name} #{message}"
+    end
+
+    def connect(config, &after_connect)
+      @amqp_conn = AMQP.connect(config) do |connection, open_ok|
+        @channel = AMQP::Channel.new @amqp_conn
+        @channel.auto_recovery = true
+        @exchange = @channel.direct ''
+        after_connect.call
       end
-      @channel = AMQP::Channel.new @amqp_conn
-      @channel.auto_recovery = true
-      @exchange = @channel.direct ''
     end
 
     def publish(*args, &block)
@@ -49,28 +53,24 @@ module Combi
     end
 
     def respond(response, delivery_info)
-      if response.is_a? Proc
-        Thread.new do
-          publish response.call, routing_key: delivery_info.reply_to, correlation_id: delivery_info.correlation_id
-        end
-      else
-        publish response, routing_key: delivery_info.reply_to, correlation_id: delivery_info.correlation_id
-      end
+      response = response.call if response.respond_to? :call
+      publish response, routing_key: delivery_info.reply_to, correlation_id: delivery_info.correlation_id
     end
 
     def create_rpc_queue
       @rpc_queue.unsubscribe unless @rpc_queue.nil?
-      @rpc_responses = {}
       @rpc_queue = queue('', exclusive: true, auto_delete: true) do |rpc_queue|
-        rpc_queue.subscribe do |header, response|
-          @rpc_responses[header.correlation_id] = { 'response' => response, 'amqp_header' => header }
-        end
+        log "\tRPC QUEUE: #{@rpc_queue.name}"
+        @ready = true
+        rpc_queue.subscribe &@response_store.method(:handle_rpc_response)
       end
     end
 
     def call(kind, message, options = {routing_key: 'rcalls_queue'}, &block)
-      raise "RPC is not enabled or reply_to is not included" if @rpc_queue.nil? && options[:reply_to].nil?
+      log "sending request #{message.inspect} with options #{options.inspect}"
+      raise "RPC is not enabled or reply_to is not included" if @rpc_queue.name.nil? && options[:reply_to].nil?
       reply_to = options[:reply_to] || @rpc_queue.name
+      log "reply to: #{reply_to}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       correlation_id = rand(10_000_000).to_s
       request = {
@@ -80,19 +80,57 @@ module Combi
       }
       publish(request, routing_key: options[:routing_key], reply_to: reply_to, correlation_id: correlation_id)
       return if block.nil?
-      elapsed = 0
-      raw_response = @rpc_responses[correlation_id]
-      poll_time = options[:timeout] / Combi::Bus::RPC_MAX_POLLS
-      while(raw_response.nil? && elapsed < options[:timeout]) do
-        sleep(poll_time)
-        elapsed += poll_time
-        raw_response = @rpc_responses[correlation_id]
+      EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout], &block)
+    end
+
+    class ResponseStore
+      def initialize()
+        @responses = {}
       end
-      if raw_response.nil? && elapsed >= options[:timeout]
-        raise Timeout::Error
-      else
-        block.call(raw_response['response']) unless block.nil?
+
+      def handle_rpc_response(header, response)
+        store header.correlation_id,
+              { 'response' => response,
+                'amqp_header' => header }
+      end
+
+      def store(key, value)
+        @responses[key] = value
+      end
+
+      def poll(key)
+        @responses[key]
       end
     end
+
+    class EventedWaiter
+      def self.wait_for(key, response_store, timeout, &block)
+        @waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS, block)
+        @waiter.evented_wait
+      end
+
+      def initialize(key, response_store, timeout, max_polls, block)
+        @key = key
+        @response_store = response_store
+        @timeout = timeout
+        @max_polls = max_polls
+        @block = block
+        @poll_delay = timeout.fdiv Combi::Bus::RPC_MAX_POLLS
+        @elapsed = 0.0
+      end
+
+      def evented_wait
+        @elapsed += @poll_delay
+        value = @response_store.poll(@key)
+        if value.nil? && @elapsed < @timeout
+          EM.add_timer @poll_delay, &method(:evented_wait)
+        elsif @elapsed < @timeout
+          @block.call value
+        else
+          # timeout
+        end
+      end
+    end
+
   end
 end

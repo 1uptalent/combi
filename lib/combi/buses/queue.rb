@@ -3,34 +3,33 @@ require 'combi/queue_service'
 
 module Combi
   class Queue < Bus
+    attr_reader :queue_service
 
-    def post_initialize
-      unless @options[:init_queue] == false
-        EventMachine.next_tick do
-          Combi::QueueService.start(@options[:amqp_config], rpc: :enabled)
-        end
-      end
+    def initialize(options)
+      super
+      @queue_service = nil
+    end
+
+    def log(message)
+      puts "#{object_id} #{self.class.name} #{message}"
     end
 
     def start!
       @stop_requested = false
-      until stop_requested?
-        loop
-        sleep 1 unless stop_requested?
+      @queue_service = Combi::QueueService.new(@options[:amqp_config], rpc: :enabled)
+      100.times do
+        return if @queue_service.ready?
+        sleep 0.1
       end
+      raise "Queue service didn't get to a ready state"
     end
 
     def stop!
       @stop_requested = true
-      puts "stop requested"
-      EM.stop_event_loop if EM.reactor_running?
+      log "stop requested"
     end
 
     def loop
-      EventMachine.run do
-        Signal.trap("INT")  { stop! }
-        Signal.trap("TERM") { stop! }
-      end
     end
 
     def stop_requested?
@@ -39,19 +38,29 @@ module Combi
 
     def request(name, kind, message, options = {timeout: 0.1}, &block)
       options[:routing_key] = name
+      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       if block.nil? || options[:async] == false
         queue_service.call(kind, message, options, &block)
       else
-        begin
-          queue_service.call(kind, message, options, &block)
-        rescue Timeout::Error => e
-          raise
-        rescue => e
-          puts "ERROR!!!"
-          puts e.message
-          puts e.backtrace
-          retry
-        end
+        request_sync(kind, message, options, &block)
+      end
+    end
+
+    def request_sync(kind, message, options, &block)
+      elapsed = 0
+      raw_response = nil
+      queue_service.call(kind, message, options) do |async_response|
+        raw_response = async_response
+      end
+      poll_time = options[:timeout].fdiv RPC_MAX_POLLS
+      while(raw_response.nil? && elapsed < options[:timeout]) do
+        sleep(poll_time)
+        elapsed += poll_time
+      end
+      if raw_response == nil && elapsed >= options[:timeout]
+        raise Timeout::Error
+      else
+        block.call(raw_response['response'])
       end
     end
 
@@ -79,10 +88,6 @@ module Combi
       return unless service_instance.respond_to?(kind)
       response = service_instance.send(kind, payload)
       queue_service.respond(response, delivery_info) unless response.nil?
-    end
-
-    def queue_service
-      @@queue_service ||= Combi::QueueService.instance
     end
 
   end

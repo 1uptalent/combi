@@ -18,14 +18,12 @@ shared_examples_for "standard_bus" do
   end
 
   Given(:provider_started) {
-    Thread.new { provider.start! }
-    sleep 0.5
+    provider.start!
     true
   }
 
   Given(:consumer_started) {
-    Thread.new { consumer.start! }
-    sleep 0.1
+    consumer.start!
     true
   }
 
@@ -51,9 +49,5 @@ shared_examples_for "standard_bus" do
         end
       end.to raise_error Timeout::Error
     end
-  end
-
-  after :each do
-    consumer.stop!
   end
 end
