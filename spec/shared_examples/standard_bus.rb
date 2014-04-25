@@ -50,8 +50,4 @@ shared_examples_for "standard_bus" do
       end.to raise_error Timeout::Error
     end
   end
-
-  after :each do
-    consumer.stop!
-  end
 end
