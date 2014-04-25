@@ -46,11 +46,14 @@ describe "in a multi bus environment" do
   end
 
   Given(:handler) { double('handler', on_open: nil) }
-  Given(:client_options) do
+  Given(:socket_client_options) do
     { remote_api: 'ws://localhost:9292/',
       handler: handler }
   end
 
+  Given(:http_client_options) do
+    { remote_api: 'http://localhost:9292/' }
+  end
 
   before(:all) {
     RabbitmqServer.instance.stop! if ENV['CLEAN']
@@ -90,89 +93,30 @@ describe "in a multi bus environment" do
 
   Given(:in_process_provider) { Combi::ServiceBus.init_for(:in_process, {}) }
   Given(:in_process_consumer) { in_process_provider }
+  Given(:http_provider)       { Combi::ServiceBus.init_for(:http, {} ) }
+  Given(:http_consumer)       { Combi::ServiceBus.init_for(:http, http_client_options) }
   Given(:queue_provider)      { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config } ) }
   Given(:queue_consumer)      { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config } ) }
   Given(:socket_provider)     { Combi::ServiceBus.init_for(:web_socket, {} ) }
-  Given(:socket_consumer)     { Combi::ServiceBus.init_for(:web_socket, client_options) }
+  Given(:socket_consumer)     { Combi::ServiceBus.init_for(:web_socket, socket_client_options) }
 
-  context "queue inside in process" do
+  BUSES = %w{in_process http queue socket}
 
-    Given(:main_bus_provider)     { in_process_provider }
-    Given(:main_bus_consumer)     { in_process_consumer }
-    Given(:internal_bus_provider) { queue_provider }
-    Given(:internal_bus_consumer) { queue_consumer }
+  BUSES.each do |main|
+    BUSES.each do |internal|
+      context "#{internal} inside #{main}" do
 
-    Then do
-      composed_result.should eq expected_result
+        Given(:main_bus_provider)     { send "#{main}_provider" }
+        Given(:main_bus_consumer)     { send "#{main}_consumer" }
+        Given(:internal_bus_provider) { send "#{internal}_provider" }
+        Given(:internal_bus_consumer) { send "#{internal}_consumer" }
+
+        Then do
+          composed_result.should eq expected_result
+        end
+
+      end
     end
-
   end
-
-  context "in process inside queue" do
-
-    Given(:main_bus_provider)     { queue_provider }
-    Given(:main_bus_consumer)     { queue_consumer }
-    Given(:internal_bus_provider) { in_process_provider }
-    Given(:internal_bus_consumer) { in_process_provider }
-
-    Then do
-      composed_result.should eq expected_result
-    end
-
-  end
-
-  context "socket inside queue" do
-
-    Given(:main_bus_provider)     { queue_provider }
-    Given(:main_bus_consumer)     { queue_consumer }
-    Given(:internal_bus_provider) { socket_provider }
-    Given(:internal_bus_consumer) { socket_consumer }
-
-    Then do
-      composed_result.should eq expected_result
-    end
-
-  end
-
-  context "queue inside socket" do
-
-    Given(:main_bus_provider)     { socket_provider }
-    Given(:main_bus_consumer)     { socket_consumer }
-    Given(:internal_bus_provider) { queue_provider }
-    Given(:internal_bus_consumer) { queue_consumer }
-
-    Then do
-      composed_result.should eq expected_result
-    end
-
-  end
-
-  context "in process inside socket" do
-
-    Given(:main_bus_provider)     { socket_provider }
-    Given(:main_bus_consumer)     { socket_consumer }
-    Given(:internal_bus_provider) { in_process_provider }
-    Given(:internal_bus_consumer) { in_process_provider }
-
-    Then do
-      composed_result.should eq expected_result
-    end
-
-  end
-
-  context "socket inside in process" do
-
-    Given(:main_bus_provider)     { in_process_provider }
-    Given(:main_bus_consumer)     { in_process_consumer }
-    Given(:internal_bus_provider) { socket_provider }
-    Given(:internal_bus_consumer) { socket_consumer }
-
-    Then do
-      composed_result.should eq expected_result
-    end
-
-  end
-
-
 
 end
