@@ -11,12 +11,6 @@ module Combi
         @bus = bus
       end
 
-      def start!
-      end
-
-      def stop!
-      end
-
       def on_message(request)
         path = request.path.split('/')
         message = {
@@ -41,17 +35,6 @@ module Combi
         @bus = bus
       end
 
-      def start!
-      end
-
-      def stop!
-      end
-
-      def restart!
-        stop!
-        start!
-      end
-
     end
 
     def post_initialize
@@ -61,14 +44,6 @@ module Combi
       else
         @machine = Server.new(self)
       end
-    end
-
-    def start!
-      @machine.start!
-    end
-
-    def stop!
-      @machine.stop!
     end
 
     def manage_request(env)
