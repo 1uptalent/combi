@@ -46,13 +46,14 @@ describe "in a multi bus environment" do
   end
 
   Given(:handler) { double('handler', on_open: nil) }
+  Given(:server_port_socket) { 9292 + rand(30000) }
   Given(:socket_client_options) do
-    { remote_api: 'ws://localhost:9292/',
+    { remote_api: "ws://localhost:#{server_port_socket}/",
       handler: handler }
   end
-
+  Given(:server_port_http) { 9292 + rand(30000) }
   Given(:http_client_options) do
-    { remote_api: 'http://localhost:9292/' }
+    { remote_api: "http://localhost:#{server_port_http}/" }
   end
 
   before(:all) {
@@ -67,15 +68,6 @@ describe "in a multi bus environment" do
     RabbitmqServer.instance.stop! if ENV['CLEAN']
   }
 
-  Given!(:buses_are_started) {
-    Thread.new { internal_bus_provider.start! }
-    Thread.new { internal_bus_consumer.start! }
-    Thread.new { main_bus_consumer.start! }
-    Thread.new { main_bus_provider.start! }
-    sleep 0.1
-    true
-  }
-
   Given(:options) { {timeout: 5} }
 
   Given(:composed_result) {
@@ -86,8 +78,8 @@ describe "in a multi bus environment" do
     service_result
   }
 
-  When(:service_in_process) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer) }
-  When(:service_in_queue)   { internal_bus_provider.add_service boring_salutation_service }
+  Given(:service_for_main_bus) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer) }
+  Given(:service_for_internal_bus)   { internal_bus_provider.add_service boring_salutation_service }
   When(:params) { { who: 'world' } }
   When(:expected_result) { "Hello worldHello world" }
 
@@ -100,21 +92,69 @@ describe "in a multi bus environment" do
   Given(:socket_provider)     { Combi::ServiceBus.init_for(:web_socket, {} ) }
   Given(:socket_consumer)     { Combi::ServiceBus.init_for(:web_socket, socket_client_options) }
 
-  BUSES = %w{in_process http queue socket}
+  BUSES = %w{in_process socket http queue}
 
   BUSES.each do |main|
     BUSES.each do |internal|
-      context "#{internal} inside #{main}" do
+      if main != internal
+        context "#{internal} inside #{main}" do
+          before(:all) do
+            if RabbitmqServer.instance.start!
+              puts "Giving time to rabbitmq"
+              sleep 1
+            end
+          end
+          before(:each) do
+            start_background_reactor
+            main_bus_provider.start!
+            internal_bus_provider.start!
+            main_bus_consumer.start!
+            internal_bus_consumer.start!
+          end
 
-        Given(:main_bus_provider)     { send "#{main}_provider" }
-        Given(:main_bus_consumer)     { send "#{main}_consumer" }
-        Given(:internal_bus_provider) { send "#{internal}_provider" }
-        Given(:internal_bus_consumer) { send "#{internal}_consumer" }
+          Given(:main_bus_provider)     { send "#{main}_provider" }
+          Given(:main_bus_consumer)     { send "#{main}_consumer" }
+          Given(:internal_bus_provider) { send "#{internal}_provider" }
+          Given(:internal_bus_consumer) { send "#{internal}_consumer" }
 
-        Then do
-          composed_result.should eq expected_result
+          Given("#{main}_server".to_sym) do
+            if main == 'http'
+              start_web_server main_bus_provider, server_port_http
+            end
+            if main == 'socket'
+              start_em_websocket_server main_bus_provider, server_port_socket
+            end
+          end
+          Given("#{internal}_server".to_sym) do
+            if internal == 'http'
+              start_web_server internal_bus_provider, server_port_http
+            end
+            if internal == 'socket'
+              start_em_websocket_server internal_bus_provider, server_port_socket
+            end
+          end
+          Given!("buses started") do
+            service_for_main_bus
+            service_for_internal_bus
+            send("#{main}_server")
+            send("#{internal}_server")
+            true
+          end
+
+          Then do
+            puts "#{internal} inside #{main}"
+            composed_result.should eq expected_result
+          end
+
+          after :each do
+            main_bus_consumer.stop!
+            internal_bus_consumer.stop!
+            main_bus_provider.stop!
+            internal_bus_provider.stop!
+            stop_background_reactor
+          end
+
         end
-
       end
     end
   end
