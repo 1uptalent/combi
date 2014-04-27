@@ -46,13 +46,10 @@ module Combi
       end
 
       def start!
-        @stop_requested = false
-        reset_back_off_delay!
         open_websocket
       end
 
       def stop!
-        @stop_requested = true
         @ws && @ws.close
         @bus.log "stop requested"
       end
@@ -67,7 +64,6 @@ module Combi
         @ws = ws = Faye::WebSocket::Client.new(@remote_api)
         ws.on :open do |event|
           @bus.log "OPEN"
-          reset_back_off_delay!
           @bus.log "HANDLER #{@handler.inspect}"
           @handler.on_open
         end
@@ -86,31 +82,12 @@ module Combi
         ws.on :error do |event|
           @bus.log  "received error: #{event.inspect}"
           stop!
-          back_off!
         end
       end
 
       def ws
         @bus.log "ws present: #{@ws != nil}"
         @ws
-      end
-
-      protected
-
-      def stop_requested?
-        @stop_requested
-      end
-
-      def reset_back_off_delay!
-        @back_off_delay = 1
-      end
-
-      def back_off!
-        puts "Backing off for #{@back_off_delay} seconds"
-        EM::add_timer @back_off_delay do
-          @back_off_delay = [@back_off_delay * 2, 300].min
-          open_websocket
-        end
       end
 
     end
