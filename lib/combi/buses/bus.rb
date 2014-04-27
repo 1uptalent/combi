@@ -59,7 +59,7 @@ module Combi
 
     def make_service_instance(service_definition)
       if Combi::Service === service_definition
-        service = service_definition 
+        service = service_definition
       else
         service = create_service_from_module(service_definition)
       end
@@ -68,7 +68,7 @@ module Combi
     def create_service_from_module(a_module)
       service_class = Class.new do
         include Combi::Service
-        include a_module  
+        include a_module
       end
       service = service_class.new
     end
