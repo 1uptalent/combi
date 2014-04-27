@@ -15,25 +15,12 @@ module Combi
     end
 
     def start!
-      @stop_requested = false
       @queue_service = Combi::QueueService.new(@options[:amqp_config], rpc: :enabled)
       100.times do
-        return if @queue_service.ready?
+        return if queue_service.ready?
         sleep 0.1
       end
       raise "Queue service didn't get to a ready state"
-    end
-
-    def stop!
-      @stop_requested = true
-      log "stop requested"
-    end
-
-    def loop
-    end
-
-    def stop_requested?
-      @stop_requested
     end
 
     def request(name, kind, message, options = {timeout: 0.1}, &block)
