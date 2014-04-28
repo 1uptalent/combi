@@ -18,12 +18,16 @@ shared_examples_for "standard_bus" do
   end
 
   Given(:provider_started) {
-    provider.start!
+    EM.next_tick do
+      provider.start!
+    end
     true
   }
 
   Given(:consumer_started) {
-    consumer.start!
+    EM.run do
+      consumer.start!
+    end
     true
   }
 
@@ -32,22 +36,33 @@ shared_examples_for "standard_bus" do
     When(:params) { { who: 'world' } }
     Then do
       service_result = nil
-      consumer.request(:say_hello, :do_it, params) do |result|
-        service_result = result
+      em do
+        puts ">>> TEST START"
+        service_result = consumer.request(:say_hello, :do_it, params)
+        puts '-->'
+        puts service_result
+        puts "joining reactor"
+        #start_background_reactor
+        #Combi::Reactor.join_thread
+        puts ">>> TEST END"
+        done
       end
+      puts "after EM"
       service_result.should eq "Hello world"
     end
   end
-
-  context 'raises Timeout::Error when the response is slow' do
-    When(:params) { { time: 0.01 } }
-    When(:service) { provider.add_service slow_service }
-    Then do
-      expect do
-        consumer.request(:sleep, :do_it, params, { timeout: params[:time]/2.0 }) do
-          raise "Should never get here"
-        end
-      end.to raise_error Timeout::Error
-    end
-  end
+  #
+  # context 'raises Timeout::Error when the response is slow' do
+  #   When(:params) { { time: 0.01 } }
+  #   When(:service) { provider.add_service slow_service }
+  #   Then do
+  #     expect do
+  #       consumer.request(:sleep, :do_it, params, { timeout: params[:time]/2.0 })
+  #       done
+  #     end.to raise_error Timeout::Error
+  #     #start_background_reactor
+  #     #Combi::Reactor.join_thread
+  #
+  #   end
+  # end
 end

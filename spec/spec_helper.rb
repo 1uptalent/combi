@@ -17,5 +17,6 @@ RSpec.configure do |config|
 end
 
 require 'rspec-given'
+require 'evented-spec'
 Dir["./spec/support/**/*.rb"].sort.each {|f| require f}
 Dir["./spec/shared_examples/**/*.rb"].sort.each {|f| require f}

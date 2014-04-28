@@ -30,29 +30,34 @@ module Combi
         queue_service.call(kind, message, options, &block)
       else
         request_sync(kind, message, options, &block)
+        #queue_service.call(kind, message, options, &block)
       end
     end
 
     def request_sync(kind, message, options, &block)
-      elapsed = 0
       raw_response = nil
-      queue_service.call(kind, message, options) do |async_response|
-        raw_response = async_response
-      end
-      poll_time = options[:timeout].fdiv RPC_MAX_POLLS
-      while(raw_response.nil? && elapsed < options[:timeout]) do
-        sleep(poll_time)
-        elapsed += poll_time
-      end
-      if raw_response == nil && elapsed >= options[:timeout]
-        raise Timeout::Error
-      else
-        block.call(raw_response['response'])
+      EM::run do
+        elapsed = 0
+        queue_service.call(kind, message, options) do |async_response|
+          raw_response = async_response
+        end
+        poll_time = options[:timeout].fdiv RPC_MAX_POLLS
+        while(raw_response.nil? && elapsed < options[:timeout]) do
+          puts "."
+          sleep(poll_time)
+          elapsed += poll_time
+        end
+        if raw_response == nil && elapsed >= options[:timeout]
+          raise Timeout::Error
+        else
+          puts "RESPONSE!!"
+          block.call(raw_response['response'])
+        end
       end
     end
 
     def respond_to(service_instance, handler, options = {})
-      EventMachine.next_tick do
+      EventMachine::run do
         queue_options = {}
         subscription_options = {}
         if options[:fast] == true
@@ -61,6 +66,9 @@ module Combi
           subscription_options[:ack] = true
         end
         queue_service.queue(handler.to_s, queue_options).subscribe(subscription_options) do |delivery_info, payload|
+          puts "--->"
+          puts payload
+          puts "----"
           respond service_instance, payload, delivery_info
           queue_service.acknowledge delivery_info unless options[:fast] == true
         end
@@ -74,6 +82,10 @@ module Combi
       options = message['options']
       return unless service_instance.respond_to?(kind)
       response = service_instance.send(kind, payload)
+      puts "<---"
+      puts response
+      puts "----"
+
       queue_service.respond(response, delivery_info) unless response.nil?
     end
 

@@ -17,4 +17,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'faye-websocket', '~> 0.7.2'
   s.add_development_dependency 'em-websocket', '~> 0.5'
   s.add_development_dependency 'thin', '~> 1.6.2'
+  s.add_development_dependency 'em-synchrony', '~> 1.0.3'
+  s.add_development_dependency 'evented-spec', '~> 0.9.0'
 end

@@ -4,6 +4,8 @@ require 'combi/service_bus'
 require 'combi/buses/web_socket'
 
 describe 'Combi::WebSocket' do
+  include EventedSpec::SpecHelper
+
   context 'can be instanitated via ServiceBus' do
     When(:bus) { Combi::ServiceBus.init_for(:web_socket, {}) }
     Then { Combi::WebSocket === bus }
@@ -24,7 +26,7 @@ describe 'Combi::WebSocket' do
   Given(:consumer) { Combi::ServiceBus.init_for(:web_socket, client_options) }
 
   it_behaves_like 'standard_bus' do
-    before(:each) { start_background_reactor }
+    before(:each) {  }
 
     Given(:webserver) { start_em_websocket_server provider, server_port }
     Given!("consumer started") do
@@ -33,7 +35,7 @@ describe 'Combi::WebSocket' do
 
     after(:each) do
       consumer.stop!
-      stop_background_reactor
+      #stop_background_reactor
     end
   end
 end
