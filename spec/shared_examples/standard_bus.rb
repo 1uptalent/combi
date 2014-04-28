@@ -5,7 +5,6 @@ shared_examples_for "standard_bus" do
     Module.new do
       def actions; [:sleep]; end
       def do_it(params)
-        puts "slooooow service"
         sleep params['time']
       end
     end
@@ -25,22 +24,15 @@ shared_examples_for "standard_bus" do
     When(:params) { { who: 'world' } }
     Then do
       em do
-        puts ">>> TEST START"
         provider.start!
         webserver
         consumer.start!
         EM.synchrony do
           service_result = EM::Synchrony.sync consumer.request(:say_hello, :do_it, params)
-          puts "after SYNC"
-          puts "RESULT IS:"
-          puts service_result
-          puts "-"*40
           service_result.should eq "Hello world"
           done
         end
-        puts ">>> TEST END"
       end
-      puts "after EM"
     end
   end
 
@@ -49,45 +41,36 @@ shared_examples_for "standard_bus" do
     When(:params) { { who: 'world' } }
     Then do
       em do
-        puts ">>> TEST START ASYNC"
         provider.start!
         webserver
         consumer.start!
-        service_result = consumer.rrequest(:say_hello, :do_it, params)
-        puts "after ASYNC"
-        puts "RESULT IS:"
-        puts service_result
-        puts "-"*40
-        service_result.should eq "Hello world"
-        done
-        puts ">>> TEST END"
+        service_result = nil
+        Fiber.new do
+          service_result = consumer.rrequest(:say_hello, :do_it, params)
+          service_result.should eq "Hello world"
+        end.resume
+        done(0.1) #without a timeout, test will finalize meanwhile the service is running
       end
-      puts "after EM"
     end
   end
 
-  # context 'raises Timeout::Error when the response is slow' do
-  #   When(:params) { { time: 0.01 } }
-  #   When(:service) { provider.add_service slow_service }
-  #   Then do
-  #     em do
-  #       provider.start!
-  #       webserver
-  #       consumer.start!
-  #       expect do
-  #         puts "1"*40
-  #         EM.synchrony do
-  #           res = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: params[:time]/2.0 })
-  #           puts "-"*30
-  #           puts res.inspect
-  #           puts "2"*40
-  #         end
-  #       end.to raise_error Timeout::Error
-  #       done
-  #     end
-  #     #start_background_reactor
-  #     #Combi::Reactor.join_thread
-  #
-  #   end
-  # end
+  context 'raises Timeout::Error when the response is slow' do
+    Given(:time_base) { 0.01 }
+    When(:params) { { time: time_base*4 } }
+    When(:service) { provider.add_service slow_service }
+    Then do
+      em do
+        provider.start!
+        webserver
+        consumer.start!
+        Fiber.new do
+          expect do
+            service_result = consumer.rrequest(:sleep, :do_it, params, { time_base: time_base/2.0 })
+            raise Kernel.const_get(service_result.message) if service_result.is_a? Exception
+          end.to raise_error Timeout::Error
+        end.resume
+        done(time_base) #timeout response must came before this timeout
+      end
+    end
+  end
 end

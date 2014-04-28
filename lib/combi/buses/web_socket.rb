@@ -164,7 +164,6 @@ module Combi
 
     def on_message(ws, message, session = nil)
       if message['correlation_id'] && message.has_key?('result')
-        puts "on message for #{message['correlation_id']}"
         @response_store.handle_rpc_response(message)
         log "Stored message with correlation_id #{message['correlation_id']} - #{message.inspect}"
         return
@@ -176,7 +175,7 @@ module Combi
       response = invoke_service(service_name, kind, payload)
       ws.send({result: 'ok',
                correlation_id: message['correlation_id'],
-               response: response}.to_json) if response != nil
+               response: response}.to_json)
     end
 
     def invoke_service(service_name, kind, payload)
@@ -201,24 +200,43 @@ module Combi
     end
 
     def rrequest(name, kind, message, options = {})
-      puts "AAAASSSSSYYYNNNCCCC"
       service_result = nil
-      EM.synchrony do
-        puts "in sync...."
-        options[:timeout] = 5
-        deferred = request_async(name, kind, message, options)
-        puts "deferred is"
-        puts deferred.inspect
-        puts "before sync"
-        service_result = EM::Synchrony.sync deferred
-        puts ".... finished"
+      deferred, msg = rrequest_async(name, kind, message, options)
+
+      f = Fiber.current
+      deferred.callback do |r|
+        f.resume(r)
       end
-      service_result
+      deferred.errback do
+        f.resume(RuntimeError.new(Timeout::Error))
+      end
+
+      web_socket = @machine.ws || options[:ws]
+      web_socket.send msg.to_json
+
+      Fiber.yield
     end
 
     def request(name, kind, message, options = {}, &block)
       request_async(name, kind, message, options)
     end
+
+    def rrequest_async(name, kind, message, options = {}, &block)
+      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
+      msg = {
+        service: name,
+        kind: kind,
+        payload: message
+      }
+      correlation_id = rand(10_000_000).to_s
+      msg[:correlation_id] = correlation_id
+      web_socket = @machine.ws || options[:ws]
+      log "sending request #{msg.inspect}"
+      raise "Websocket is nil" unless web_socket
+      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      [waiter, msg]
+    end
+
 
     def request_async(name, kind, message, options = {}, &block)
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
@@ -235,10 +253,8 @@ module Combi
       waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
       web_socket = @machine.ws || options[:ws]
       web_socket.send msg.to_json
-      puts "SENT to server"
       waiter
     end
-
 
     class ResponseStore
       def initialize()
@@ -250,9 +266,6 @@ module Combi
       end
 
       def handle_rpc_response(response)
-        puts "handling response"
-        puts response
-        puts "^"*40
         @waiters[response['correlation_id']].succeed(response['response'])
         @waiters.delete response['correlation_id']
       end
@@ -262,14 +275,12 @@ module Combi
       include EM::Deferrable
 
       def self.wait_for(key, response_store, timeout)
-        puts "waiting for... #{key}"
         waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS)
         response_store.add_waiter(key, waiter)
         waiter
       end
 
       def initialize(key, response_store, timeout, max_polls)
-        puts "timing out at #{timeout}"
         self.timeout(timeout, "TIMEOUT")
       end
 
