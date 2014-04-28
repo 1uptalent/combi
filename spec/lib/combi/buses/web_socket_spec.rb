@@ -26,16 +26,6 @@ describe 'Combi::WebSocket' do
   Given(:consumer) { Combi::ServiceBus.init_for(:web_socket, client_options) }
 
   it_behaves_like 'standard_bus' do
-    before(:each) {  }
-
     Given(:webserver) { start_em_websocket_server provider, server_port }
-    Given!("consumer started") do
-      provider_started && webserver && consumer_started
-    end
-
-    after(:each) do
-      consumer.stop!
-      #stop_background_reactor
-    end
   end
 end

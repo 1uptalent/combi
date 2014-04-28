@@ -200,24 +200,24 @@ module Combi
       log "handlers: #{handlers.keys.inspect}"
     end
 
+    def rrequest(name, kind, message, options = {})
+      puts "AAAASSSSSYYYNNNCCCC"
+      service_result = nil
+      EM.synchrony do
+        puts "in sync...."
+        options[:timeout] = 5
+        deferred = request_async(name, kind, message, options)
+        puts "deferred is"
+        puts deferred.inspect
+        puts "before sync"
+        service_result = EM::Synchrony.sync deferred
+        puts ".... finished"
+      end
+      service_result
+    end
+
     def request(name, kind, message, options = {}, &block)
-      result = nil
-      Fiber.new do
-        waiter = request_async(name, kind, message, options)
-        puts "WAITER => "
-        puts waiter.inspect
-        result, exception = EM.synchrony.sync waiter
-        if exception
-          puts "exc"
-          raise exception
-        else
-          puts "RESULT!!!!"
-          puts result.inspect
-          result
-        end
-        puts "after wait"
-      end.resume
-      puts "fiber done!"
+      request_async(name, kind, message, options)
     end
 
     def request_async(name, kind, message, options = {}, &block)
@@ -230,34 +230,18 @@ module Combi
       correlation_id = rand(10_000_000).to_s
       msg[:correlation_id] = correlation_id
       web_socket = @machine.ws || options[:ws]
-      raise "Websocket is nil" unless web_socket
       log "sending request #{msg.inspect}"
+      raise "Websocket is nil" unless web_socket
+      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      web_socket = @machine.ws || options[:ws]
       web_socket.send msg.to_json
       puts "SENT to server"
-      if block.nil?
-        puts "THIS!!"
-        return EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
-      else
-        elapsed = 0
-        raw_response = @rpc_responses[correlation_id]
-        poll_time = options[:timeout].fdiv RPC_MAX_POLLS
-        while(raw_response.nil? && elapsed < options[:timeout]) do
-          sleep(poll_time)
-          elapsed += poll_time
-          raw_response = @rpc_responses[correlation_id]
-        end
-        if raw_response == nil && elapsed >= options[:timeout]
-          raise Timeout::Error
-        else
-          block.call(raw_response['response'])
-        end
-      end
+      waiter
     end
 
 
     class ResponseStore
       def initialize()
-        @responses = {}
         @waiters = {}
       end
 
@@ -266,62 +250,29 @@ module Combi
       end
 
       def handle_rpc_response(response)
+        puts "handling response"
         puts response
         puts "^"*40
         @waiters[response['correlation_id']].succeed(response['response'])
-        # store response['correlation_id'],
-        #       { 'response' => response,
-        #         'metadata' => 'from_web_socket' }
+        @waiters.delete response['correlation_id']
       end
-
-      # def store(key, value)
-      #   @responses[key] = value
-      # end
-
-      # def poll(key)
-      #   @responses[key]
-      # end
     end
 
     class EventedWaiter
       include EM::Deferrable
 
-      def self.wait_for(key, response_store, timeout, &block)
+      def self.wait_for(key, response_store, timeout)
         puts "waiting for... #{key}"
-        waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS, block)
+        waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS)
         response_store.add_waiter(key, waiter)
-        f = Fiber.current
-        waiter.callback{ |r| f.resume(waiter) }
-        waiter.errback{|*errors| f.resume(*errors)}
-        Fiber.yield
+        waiter
       end
 
-      def initialize(key, response_store, timeout, max_polls, block)
-        #@key = key
-        #@response_store = response_store
-        #@timeout = timeout
-        self.timeout(timeout)
-        #self.callback(&block)
-        #@max_polls = max_polls
-        #@block = block
-        #@poll_delay = timeout.fdiv Combi::Bus::RPC_MAX_POLLS
-        #@elapsed = 0.0
+      def initialize(key, response_store, timeout, max_polls)
+        puts "timing out at #{timeout}"
+        self.timeout(timeout, "TIMEOUT")
       end
 
-      # def evented_wait
-      #   @elapsed += @poll_delay
-      #   value = @response_store.poll(@key)
-      #   if value.nil? && @elapsed < @timeout
-      #     puts "."
-      #     EM.add_timer @poll_delay, &method(:evented_wait)
-      #   elsif @elapsed < @timeout
-      #     puts "returning value..."
-      #     puts value
-      #     succeed value
-      #   else
-      #     # timeout
-      #   end
-      # end
     end
 
 
