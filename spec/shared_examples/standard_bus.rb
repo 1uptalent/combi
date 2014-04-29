@@ -1,3 +1,4 @@
+require "em-synchrony"
 
 shared_examples_for "standard_bus" do
 
@@ -19,37 +20,23 @@ shared_examples_for "standard_bus" do
     end
   end
 
+  Given(:finalize) do
+    provider.stop!
+    consumer.stop!
+  end
+
   context 'can invoke services' do
     When(:service) { provider.add_service boring_salutation_service }
     When(:params) { { who: 'world' } }
     Then do
       em do
-        provider.start!
-        webserver
-        consumer.start!
+        prepare
         EM.synchrony do
-          service_result = EM::Synchrony.sync consumer.request(:say_hello, :do_it, params)
+          service_result = EM::Synchrony.sync consumer.request(:say_hello, :do_it, params, { timeout: 2 })
           service_result.should eq "Hello world"
           done
+          finalize
         end
-      end
-    end
-  end
-
-  context 'can invoke services async' do
-    When(:service) { provider.add_service boring_salutation_service }
-    When(:params) { { who: 'world' } }
-    Then do
-      em do
-        provider.start!
-        webserver
-        consumer.start!
-        service_result = nil
-        Fiber.new do
-          service_result = consumer.rrequest(:say_hello, :do_it, params)
-          service_result.should eq "Hello world"
-        end.resume
-        done(0.1) #without a timeout, test will finalize meanwhile the service is running
       end
     end
   end
@@ -60,16 +47,15 @@ shared_examples_for "standard_bus" do
     When(:service) { provider.add_service slow_service }
     Then do
       em do
-        provider.start!
-        webserver
-        consumer.start!
-        Fiber.new do
+        prepare
+        EM.synchrony do
           expect do
-            service_result = consumer.rrequest(:sleep, :do_it, params, { time_base: time_base/2.0 })
+            service_result = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: time_base/2.0 })
             raise Kernel.const_get(service_result.message) if service_result.is_a? Exception
           end.to raise_error Timeout::Error
-        end.resume
-        done(time_base) #timeout response must came before this timeout
+          done(time_base) #timeout response must came before this timeout
+        end
+        finalize
       end
     end
   end

@@ -8,17 +8,17 @@ module Combi
         STDERR << "\t#{error.inspect}"
         STDERR << error.backtrace << "\n"
       end
-      puts "-EM.start- the reactor is running: #{EM::reactor_running?}"
+      log "-EM.start- the reactor is running: #{EM::reactor_running?}"
       raise "EM did not shut down" if EM::reactor_running?
       @@reactor_thread = Thread.new do
-        puts "------- starting EM reactor"
+        log "------- starting EM reactor"
         EM::run do
-          puts "------- reactor started"
+          log "------- reactor started"
           Signal.trap("INT")  { EM::stop_event_loop }
           Signal.trap("TERM") { EM::stop_event_loop }
           block.call unless block.nil?
         end
-        puts "------- reactor stopped"
+        log "------- reactor stopped"
       end
       30.times do
         sleep 0.1 unless EM::reactor_running?
@@ -26,7 +26,7 @@ module Combi
     end
 
     def self.stop
-      puts "-EM.stop- the reactor is running: #{EM::reactor_running?}"
+      log "-EM.stop- the reactor is running: #{EM::reactor_running?}"
       EM::stop_event_loop if EM::reactor_running?
       50.times do
         sleep 0.3 if EM::reactor_running?
@@ -35,6 +35,11 @@ module Combi
 
     def self.join_thread
       @@reactor_thread.join if @@reactor_thread
+    end
+
+    def self.log(message)
+      return unless @debug_mode ||= ENV['DEBUG'] == 'true'
+      puts "#{object_id} #{self.class.name} #{message}"
     end
 
   end

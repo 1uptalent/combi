@@ -15,8 +15,7 @@ describe 'Combi::WebSocket' do
       def on_open; end
     end.new
   end
-  # Workaround to random errors because the port is in use
-  # My guess (amuino): Tests are too fast/closing the servers is slow
+
   Given(:server_port) { 9292 + rand(30000) }
   Given(:client_options) do
     { remote_api: "ws://localhost:#{server_port}/",
@@ -24,8 +23,12 @@ describe 'Combi::WebSocket' do
   end
   Given(:provider) { Combi::ServiceBus.init_for(:web_socket, {} )}
   Given(:consumer) { Combi::ServiceBus.init_for(:web_socket, client_options) }
-
-  it_behaves_like 'standard_bus' do
-    Given(:webserver) { start_em_websocket_server provider, server_port }
+  Given(:prepare) do
+    provider.start!
+    start_em_websocket_server provider, server_port
+    consumer.start!
   end
+
+  it_behaves_like 'standard_bus'
+
 end

@@ -15,8 +15,9 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rspec-given', '~> 3.5.4'
   s.add_development_dependency 'amqp', '~> 1.3.0'
   s.add_development_dependency 'faye-websocket', '~> 0.7.2'
-  s.add_development_dependency 'em-websocket', '~> 0.5'
+  s.add_development_dependency 'em-websocket', '~> 0.5.1'
   s.add_development_dependency 'thin', '~> 1.6.2'
   s.add_development_dependency 'em-synchrony', '~> 1.0.3'
+  s.add_development_dependency 'em-http-request', '~> 1.1.2'
   s.add_development_dependency 'evented-spec', '~> 0.9.0'
 end

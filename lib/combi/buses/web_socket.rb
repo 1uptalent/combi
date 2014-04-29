@@ -1,5 +1,5 @@
 require 'combi/buses/bus'
-require "em-synchrony"
+require 'combi/response_store'
 
 module Combi
   class WebSocket < Bus
@@ -103,7 +103,7 @@ module Combi
     def post_initialize
       # @rpc_responses = {}
       # @rpc_callbacks = {}
-      @response_store = ResponseStore.new
+      @response_store = Combi::ResponseStore.new
       if @options[:remote_api]
         require 'eventmachine'
         @machine = Client.new(@options[:remote_api], @options[:handler], self)
@@ -158,10 +158,6 @@ module Combi
       end
     end
 
-    def log(message)
-      puts "#{object_id} #{@machine.class.name} #{message}"
-    end
-
     def on_message(ws, message, session = nil)
       if message['correlation_id'] && message.has_key?('result')
         @response_store.handle_rpc_response(message)
@@ -173,9 +169,18 @@ module Combi
       payload = message['payload'] || {}
       payload['session'] = session
       response = invoke_service(service_name, kind, payload)
-      ws.send({result: 'ok',
-               correlation_id: message['correlation_id'],
-               response: response}.to_json)
+
+      msg = {result: 'ok', correlation_id: message['correlation_id']}
+
+      if response.respond_to? :succeed
+        response.callback do |service_response|
+          msg[:response] = service_response
+          ws.send(msg.to_json)
+        end
+      else
+        msg[:response] = response
+        ws.send(msg.to_json)
+      end
     end
 
     def invoke_service(service_name, kind, payload)
@@ -199,46 +204,7 @@ module Combi
       log "handlers: #{handlers.keys.inspect}"
     end
 
-    def rrequest(name, kind, message, options = {})
-      service_result = nil
-      deferred, msg = rrequest_async(name, kind, message, options)
-
-      f = Fiber.current
-      deferred.callback do |r|
-        f.resume(r)
-      end
-      deferred.errback do
-        f.resume(RuntimeError.new(Timeout::Error))
-      end
-
-      web_socket = @machine.ws || options[:ws]
-      web_socket.send msg.to_json
-
-      Fiber.yield
-    end
-
-    def request(name, kind, message, options = {}, &block)
-      request_async(name, kind, message, options)
-    end
-
-    def rrequest_async(name, kind, message, options = {}, &block)
-      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      msg = {
-        service: name,
-        kind: kind,
-        payload: message
-      }
-      correlation_id = rand(10_000_000).to_s
-      msg[:correlation_id] = correlation_id
-      web_socket = @machine.ws || options[:ws]
-      log "sending request #{msg.inspect}"
-      raise "Websocket is nil" unless web_socket
-      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
-      [waiter, msg]
-    end
-
-
-    def request_async(name, kind, message, options = {}, &block)
+    def request(name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       msg = {
         service: name,
@@ -255,37 +221,6 @@ module Combi
       web_socket.send msg.to_json
       waiter
     end
-
-    class ResponseStore
-      def initialize()
-        @waiters = {}
-      end
-
-      def add_waiter(key, waiter)
-        @waiters[key] = waiter
-      end
-
-      def handle_rpc_response(response)
-        @waiters[response['correlation_id']].succeed(response['response'])
-        @waiters.delete response['correlation_id']
-      end
-    end
-
-    class EventedWaiter
-      include EM::Deferrable
-
-      def self.wait_for(key, response_store, timeout)
-        waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS)
-        response_store.add_waiter(key, waiter)
-        waiter
-      end
-
-      def initialize(key, response_store, timeout, max_polls)
-        self.timeout(timeout, "TIMEOUT")
-      end
-
-    end
-
 
   end
 end

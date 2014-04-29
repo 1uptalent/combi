@@ -7,27 +7,33 @@ module Combi
     RPC_DEFAULT_TIMEOUT = 1
     RPC_WAIT_PERIOD = 0.01
 
+    attr_accessor :rpc_callback
+
     def initialize(config, options)
-      @response_store = ResponseStore.new
+      @config = config
+      @options = options
       @rpc_queue = nil
-      @ready = false
-      EM::next_tick do
-        connect config do
-          if options[:rpc] == :enabled
-            create_rpc_queue
-          else
-            @ready = true
-          end
-        end
-      end
+      @ready_defer = EventMachine::DefaultDeferrable.new
     end
 
-    def ready?
-      @ready
+    def ready(&block)
+      @ready_defer.callback &block
     end
 
     def log(message)
+      return unless @debug_mode ||= ENV['DEBUG'] == 'true'
       puts "#{object_id} #{self.class.name} #{message}"
+    end
+
+    def start
+      connect @config do
+        if @options[:rpc] == :enabled
+          create_rpc_queue
+        else
+          puts "ready"
+          @ready_defer.succeed
+        end
+      end
     end
 
     def connect(config, &after_connect)
@@ -36,6 +42,12 @@ module Combi
         @channel.auto_recovery = true
         @exchange = @channel.direct ''
         after_connect.call
+      end
+    end
+
+    def disconnect
+      @amqp_conn.close do
+        puts "disconnected from RABBIT"
       end
     end
 
@@ -61,75 +73,29 @@ module Combi
       @rpc_queue.unsubscribe unless @rpc_queue.nil?
       @rpc_queue = queue('', exclusive: true, auto_delete: true) do |rpc_queue|
         log "\tRPC QUEUE: #{@rpc_queue.name}"
-        @ready = true
-        rpc_queue.subscribe &@response_store.method(:handle_rpc_response)
+        rpc_queue.subscribe do |metadata, response|
+          message = {
+            'correlation_id' => metadata.correlation_id,
+            'response' => response
+          }
+          rpc_callback.call(message) unless rpc_callback.nil?
+        end
+        @ready_defer.succeed
       end
     end
 
-    def call(kind, message, options = {routing_key: 'rcalls_queue'}, &block)
+    def call(kind, message, options = {})
       log "sending request #{message.inspect} with options #{options.inspect}"
       raise "RPC is not enabled or reply_to is not included" if (@rpc_queue.nil? || @rpc_queue.name.nil?) && options[:reply_to].nil?
-      reply_to = options[:reply_to] || @rpc_queue.name
-      log "reply to: #{reply_to}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      correlation_id = rand(10_000_000).to_s
+      options[:routing_key] ||= 'rcalls_queue'
+      options[:reply_to] ||= @rpc_queue.name
       request = {
         kind: kind,
         payload: message,
         options: {}
       }
-      publish(request, routing_key: options[:routing_key], reply_to: reply_to, correlation_id: correlation_id)
-      return if block.nil?
-      EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout], &block)
-    end
-
-    class ResponseStore
-      def initialize()
-        @responses = {}
-      end
-
-      def handle_rpc_response(header, response)
-        store header.correlation_id,
-              { 'response' => response,
-                'amqp_header' => header }
-      end
-
-      def store(key, value)
-        @responses[key] = value
-      end
-
-      def poll(key)
-        @responses[key]
-      end
-    end
-
-    class EventedWaiter
-      def self.wait_for(key, response_store, timeout, &block)
-        @waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS, block)
-        @waiter.evented_wait
-      end
-
-      def initialize(key, response_store, timeout, max_polls, block)
-        @key = key
-        @response_store = response_store
-        @timeout = timeout
-        @max_polls = max_polls
-        @block = block
-        @poll_delay = timeout.fdiv Combi::Bus::RPC_MAX_POLLS
-        @elapsed = 0.0
-      end
-
-      def evented_wait
-        @elapsed += @poll_delay
-        value = @response_store.poll(@key)
-        if value.nil? && @elapsed < @timeout
-          EM.add_timer @poll_delay, &method(:evented_wait)
-        elsif @elapsed < @timeout
-          @block.call value
-        else
-          # timeout
-        end
-      end
+      publish(request, options)
     end
 
   end

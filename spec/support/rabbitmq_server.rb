@@ -1,4 +1,6 @@
 require 'singleton'
+require 'socket'
+require 'timeout'
 # Uses docker to start a server
 class RabbitmqServer
   include Singleton
@@ -10,11 +12,11 @@ class RabbitmqServer
     needs_to_start = !container_running?
     if needs_to_start
       puts "Starting new Rabbitmq container"
-      system "docker run -d -P -e RABBITMQ_PASS=#{PASSWORD} -name #{NAME} tutum/rabbitmq"
+      system "docker run -d -P -e RABBITMQ_PASS=#{PASSWORD} --name #{NAME} tutum/rabbitmq"
       puts "RABBITMQ STARTING"
-      sleep 1
     end
     start_forwarder!
+    is_port_open?('localhost', port)
     return needs_to_start
   end
 
@@ -49,6 +51,25 @@ class RabbitmqServer
     end
   end
 
+  def is_port_open?(ip, port, timeout = 15)
+    begin
+      Timeout::timeout(timeout) do
+        begin
+          s = TCPSocket.new(ip, port)
+          s.close
+          return true
+        rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
+          puts "conn error to rabbit @ #{ip}##{port}"
+          sleep 1
+          retry
+        end
+      end
+    rescue Timeout::Error
+      puts "Cannot connect to RABBIT server after #{timeout} seconds"
+    end
+
+    return false
+  end
 
   def container_running?
     `docker ps | grep #{NAME}`.length > 0

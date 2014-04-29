@@ -40,7 +40,7 @@ module Combi
         case service
         when :queue
           require 'queue_service'
-          EventMachine.next_tick do
+          EventMachine.run do
             Combi::QueueService.start ConfigProvider.for(:amqp)
           end
         when :redis
@@ -53,6 +53,11 @@ module Combi
           $service_bus = Combi::ServiceBus.for(:queue)
         end
       end
+    end
+
+    def log(message)
+      return unless @debug_mode ||= ENV['DEBUG'] == 'true'
+      puts "#{object_id} #{self.class.name} #{message}"
     end
 
     protected
@@ -72,5 +77,6 @@ module Combi
       end
       service = service_class.new
     end
+
   end
 end

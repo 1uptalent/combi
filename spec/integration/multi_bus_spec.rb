@@ -4,6 +4,7 @@ require 'combi/service_bus'
 require 'combi/buses/in_process'
 
 describe "in a multi bus environment" do
+  include EventedSpec::SpecHelper
 
   Given(:boring_salutation_service) do
     Module.new do
@@ -23,11 +24,13 @@ describe "in a multi bus environment" do
       def actions; [:repeat_with_me]; end
 
       def do_it(params)
-        service_result = ""
-        @other_client.request(:say_hello, :do_it, params) do |result|
-          service_result = result
+        defer = EventMachine::DefaultDeferrable.new
+        EM.synchrony do
+          req = @other_client.request(:say_hello, :do_it, params, timeout: 3)
+          service_result = EM::Synchrony.sync req
+          defer.succeed(service_result*2)
         end
-        service_result*2
+        defer
       end
     end
   end
@@ -58,25 +61,14 @@ describe "in a multi bus environment" do
 
   before(:all) {
     RabbitmqServer.instance.stop! if ENV['CLEAN']
-    if RabbitmqServer.instance.start!
-      puts "Giving time to rabbitmq"
-      sleep 1
-    end
+    RabbitmqServer.instance.start!
   }
 
   after(:all) {
     RabbitmqServer.instance.stop! if ENV['CLEAN']
   }
 
-  Given(:options) { {timeout: 5} }
-
-  Given(:composed_result) {
-    service_result = nil
-    main_bus_consumer.request(:repeat_with_me, :do_it, params, options) do |result|
-      service_result = result
-    end
-    service_result
-  }
+  Given(:options) { {timeout: 3} }
 
   Given(:service_for_main_bus) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer) }
   Given(:service_for_internal_bus)   { internal_bus_provider.add_service boring_salutation_service }
@@ -96,64 +88,50 @@ describe "in a multi bus environment" do
 
   BUSES.each do |main|
     BUSES.each do |internal|
-      if main != internal
-        context "#{internal} inside #{main}" do
-          before(:all) do
-            if RabbitmqServer.instance.start!
-              puts "Giving time to rabbitmq"
-              sleep 1
-            end
-          end
-          before(:each) do
-            start_background_reactor
-            main_bus_provider.start!
-            internal_bus_provider.start!
-            main_bus_consumer.start!
-            internal_bus_consumer.start!
-          end
+      context "#{internal} inside #{main}" do
+        Given(:main_bus_provider)     { send "#{main}_provider" }
+        Given(:main_bus_consumer)     { send "#{main}_consumer" }
+        Given(:internal_bus_provider) { send "#{internal}_provider" }
+        Given(:internal_bus_consumer) { send "#{internal}_consumer" }
 
-          Given(:main_bus_provider)     { send "#{main}_provider" }
-          Given(:main_bus_consumer)     { send "#{main}_consumer" }
-          Given(:internal_bus_provider) { send "#{internal}_provider" }
-          Given(:internal_bus_consumer) { send "#{internal}_consumer" }
+        Given("#{main}_server".to_sym) do
+          if main == 'http'
+            start_web_server main_bus_provider, server_port_http
+          end
+          if main == 'socket'
+            start_em_websocket_server main_bus_provider, server_port_socket
+          end
+        end
+        Given("#{internal}_server".to_sym) do
+          if internal == 'http'
+            start_web_server internal_bus_provider, server_port_http
+          end
+          if internal == 'socket'
+            start_em_websocket_server internal_bus_provider, server_port_socket
+          end
+        end
 
-          Given("#{main}_server".to_sym) do
-            if main == 'http'
-              start_web_server main_bus_provider, server_port_http
-            end
-            if main == 'socket'
-              start_em_websocket_server main_bus_provider, server_port_socket
-            end
-          end
-          Given("#{internal}_server".to_sym) do
-            if internal == 'http'
-              start_web_server internal_bus_provider, server_port_http
-            end
-            if internal == 'socket'
-              start_em_websocket_server internal_bus_provider, server_port_socket
-            end
-          end
-          Given!("buses started") do
+        Then do
+          em do
             service_for_main_bus
             service_for_internal_bus
+            main_bus_provider.start!
+            internal_bus_provider.start!
             send("#{main}_server")
             send("#{internal}_server")
-            true
-          end
+            main_bus_consumer.start!
+            internal_bus_consumer.start!
 
-          Then do
-            puts "#{internal} inside #{main}"
-            composed_result.should eq expected_result
+            EM.synchrony do
+              service_result = EM::Synchrony.sync main_bus_consumer.request(:repeat_with_me, :do_it, params, options)
+              service_result.should eq expected_result
+              done
+              main_bus_provider.stop!
+              internal_bus_provider.stop!
+              main_bus_consumer.stop!
+              internal_bus_consumer.stop!
+            end
           end
-
-          after :each do
-            main_bus_consumer.stop!
-            internal_bus_consumer.stop!
-            main_bus_provider.stop!
-            internal_bus_provider.stop!
-            stop_background_reactor
-          end
-
         end
       end
     end

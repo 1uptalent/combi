@@ -1,4 +1,6 @@
 require 'combi/buses/bus'
+require 'combi/response_store'
+require "em-synchrony"
 require 'combi/queue_service'
 
 module Combi
@@ -7,72 +9,49 @@ module Combi
 
     def initialize(options)
       super
-      @queue_service = nil
-    end
-
-    def log(message)
-      puts "#{object_id} #{self.class.name} #{message}"
+      @response_store = Combi::ResponseStore.new
+      @queue_service = Combi::QueueService.new(options[:amqp_config], rpc: :enabled)
+      queue_service.rpc_callback = lambda do |message|
+        @response_store.handle_rpc_response(message)
+      end
     end
 
     def start!
-      @queue_service = Combi::QueueService.new(@options[:amqp_config], rpc: :enabled)
-      100.times do
-        return if queue_service.ready?
-        sleep 0.1
-      end
-      raise "Queue service didn't get to a ready state"
+      queue_service.start
     end
 
-    def request(name, kind, message, options = {timeout: 0.1}, &block)
-      options[:routing_key] = name
-      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      if block.nil? || options[:async] == false
-        queue_service.call(kind, message, options, &block)
-      else
-        request_sync(kind, message, options, &block)
-        #queue_service.call(kind, message, options, &block)
-      end
-    end
-
-    def request_sync(kind, message, options, &block)
-      raw_response = nil
-      EM::run do
-        elapsed = 0
-        queue_service.call(kind, message, options) do |async_response|
-          raw_response = async_response
-        end
-        poll_time = options[:timeout].fdiv RPC_MAX_POLLS
-        while(raw_response.nil? && elapsed < options[:timeout]) do
-          puts "."
-          sleep(poll_time)
-          elapsed += poll_time
-        end
-        if raw_response == nil && elapsed >= options[:timeout]
-          raise Timeout::Error
-        else
-          puts "RESPONSE!!"
-          block.call(raw_response['response'])
-        end
+    def stop!
+      queue_service.ready do
+        @queue_service.disconnect
       end
     end
 
     def respond_to(service_instance, handler, options = {})
-      EventMachine::run do
-        queue_options = {}
-        subscription_options = {}
-        if options[:fast] == true
-          queue_options[:auto_delete] = false
-        else
-          subscription_options[:ack] = true
-        end
+      queue_options = {}
+      subscription_options = {}
+      if options[:fast] == true
+        queue_options[:auto_delete] = false
+      else
+        subscription_options[:ack] = true
+      end
+      queue_service.ready do
         queue_service.queue(handler.to_s, queue_options).subscribe(subscription_options) do |delivery_info, payload|
-          puts "--->"
-          puts payload
-          puts "----"
           respond service_instance, payload, delivery_info
           queue_service.acknowledge delivery_info unless options[:fast] == true
         end
       end
+    end
+
+    def request(name, kind, message, options = {})
+      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
+      options[:routing_key] = name.to_s
+      correlation_id = rand(10_000_000).to_s
+      options[:correlation_id] = correlation_id
+      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      queue_service.ready do
+        queue_service.call(kind, message, options)
+      end
+      waiter
     end
 
     def respond(service_instance, request, delivery_info)
@@ -82,11 +61,14 @@ module Combi
       options = message['options']
       return unless service_instance.respond_to?(kind)
       response = service_instance.send(kind, payload)
-      puts "<---"
-      puts response
-      puts "----"
 
-      queue_service.respond(response, delivery_info) unless response.nil?
+      if response.respond_to? :succeed
+        response.callback do |service_response|
+          queue_service.respond(service_response, delivery_info)
+        end
+      else
+        queue_service.respond(response, delivery_info) unless response.nil?
+      end
     end
 
   end

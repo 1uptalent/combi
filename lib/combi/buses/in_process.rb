@@ -1,4 +1,5 @@
 require 'combi/buses/bus'
+require "em-synchrony"
 
 module Combi
   class InProcess < Bus
@@ -10,11 +11,28 @@ module Combi
       service_instance = handler[:service_instance]
       message = JSON.parse(message.to_json)
       return unless service_instance.respond_to?(kind)
-      Timeout.timeout(options[:timeout]) do
-        response = service_instance.send(kind, message)
-        response = response.call if response.is_a?(Proc)
-        block.call response
+      waiter = EventMachine::DefaultDeferrable.new
+      waiter.timeout(options[:timeout], RuntimeError.new(Timeout::Error))
+      begin
+        Timeout.timeout(options[:timeout]) do
+          response = service_instance.send(kind, message)
+          if response.respond_to? :succeed
+            response.callback do |service_response|
+              waiter.succeed service_response
+            end
+          else
+            waiter.succeed response
+          end
+        end
+      rescue Timeout::Error => e
+        log "ERROR"
+        waiter.fail RuntimeError.new(Timeout::Error)
+      rescue e
+        log "other ERROR"
+        log e.inspect
       end
+
+      waiter
     end
 
     def respond_to(service_instance, handler, options = {})

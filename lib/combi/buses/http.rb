@@ -1,6 +1,6 @@
 require 'combi/buses/bus'
-require "net/http"
-require "uri"
+require 'combi/response_store'
+require 'em-http-request'
 
 module Combi
   class Http < Bus
@@ -16,13 +16,9 @@ module Combi
         message = {
           "service" => path[1],
           "kind" => path[2],
-          "payload" => JSON.parse(request.params['message'])
+          "payload" => JSON.parse(request.body)
         }
-        response_message = @bus.on_message(message)
-        response = Rack::Response.new
-        response.status = response_message.nil? ? 201 : 200
-        response.body = [response_message.to_json]
-        response.finish
+        @bus.on_message(message)
       end
 
     end
@@ -38,7 +34,7 @@ module Combi
     end
 
     def post_initialize
-      @rpc_responses = {}
+      @response_store = Combi::ResponseStore.new
       if @options[:remote_api]
         @machine = Client.new(@options[:remote_api], @options[:handler], self)
       else
@@ -51,9 +47,6 @@ module Combi
     end
 
     def on_message(message)
-      if message['correlation_id']
-        @rpc_responses[message['correlation_id']] = message
-      end
       service_name = message['service']
       handler = handlers[service_name.to_s]
       if handler
@@ -62,7 +55,7 @@ module Combi
         if service_instance.respond_to? kind
           message['payload'] ||= {}
           response = service_instance.send(kind, message['payload'])
-          {result: 'ok', correlation_id: message['correlation_id'], response: response}
+          {result: 'ok', response: response}
         end
       end
     end
@@ -75,28 +68,20 @@ module Combi
       @handlers ||= {}
     end
 
-    def request(name, kind, message, options = {}, &block)
+    def request(name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      msg = {
-        message: message.to_json
-      }
-      unless block.nil?
-        correlation_id = rand(10_000_000).to_s
-        msg[:correlation_id] = correlation_id
-      end
-      raise "Server is not specified" unless @options[:remote_api]
-      server_address = "#{@options[:remote_api]}#{name}/#{kind}"
-      uri = URI.parse(server_address)
-      http = Net::HTTP.new(uri.host, uri.port)
-      request = Net::HTTP::Post.new(uri.request_uri)
-      request.set_form_data(msg)
-      Timeout.timeout(options[:timeout]) do
-        response = http.request(request)
-        if block && response.code == "200"
-          block.call JSON.parse(response.body)['response']
-        end
-      end
 
+      correlation_id = rand(10_000_000).to_s
+      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      url = "#{@options[:remote_api]}#{name}/#{kind}"
+      request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message.to_json)
+      request_async.callback do |r|
+        waiter.succeed(JSON.parse(r.response)['response'])
+      end
+      request_async.errback do |x|
+        waiter.fail(RuntimeError.new(Timeout::Error))
+      end
+      waiter
     end
 
   end
