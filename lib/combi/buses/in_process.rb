@@ -1,5 +1,4 @@
 require 'combi/buses/bus'
-require "em-synchrony"
 
 module Combi
   class InProcess < Bus

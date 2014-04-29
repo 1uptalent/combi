@@ -1,6 +1,5 @@
 require 'combi/buses/bus'
 require 'combi/response_store'
-require "em-synchrony"
 require 'combi/queue_service'
 
 module Combi
