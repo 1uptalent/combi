@@ -1,3 +1,5 @@
+require 'eventmachine'
+
 module Combi
   class ResponseStore
     def initialize()
