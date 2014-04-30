@@ -52,7 +52,7 @@ module Combi
     end
 
     def publish(*args, &block)
-      args[0] = args[0].to_json if args[0].is_a? Hash
+      args[0] = args[0].to_json unless args[0].is_a? String
       @exchange.publish *args, &block
     end
 
