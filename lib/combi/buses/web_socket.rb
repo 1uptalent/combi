@@ -8,6 +8,7 @@ module Combi
 
       def initialize(bus)
         @bus = bus
+        @bus.ready.succeed
       end
 
       def start!
@@ -67,6 +68,7 @@ module Combi
           @bus.log "OPEN"
           @bus.log "HANDLER #{@handler.inspect}"
           @handler.on_open
+          @bus.ready.succeed
         end
 
         ws.on :message do |event|
@@ -93,7 +95,7 @@ module Combi
 
     end
 
-    attr_reader :handlers
+    attr_reader :handlers, :ready
 
     def initialize(options)
       super
@@ -101,8 +103,7 @@ module Combi
     end
 
     def post_initialize
-      # @rpc_responses = {}
-      # @rpc_callbacks = {}
+      @ready = EventMachine::DefaultDeferrable.new
       @response_store = Combi::ResponseStore.new
       if @options[:remote_api]
         require 'eventmachine'
@@ -213,12 +214,12 @@ module Combi
       }
       correlation_id = rand(10_000_000).to_s
       msg[:correlation_id] = correlation_id
-      web_socket = @machine.ws || options[:ws]
-      log "sending request #{msg.inspect}"
-      raise "Websocket is nil" unless web_socket
       waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
-      web_socket = @machine.ws || options[:ws]
-      web_socket.send msg.to_json
+      @ready.callback do |r|
+        web_socket = @machine.ws || options[:ws]
+        log "sending request #{msg.inspect}"
+        web_socket.send msg.to_json
+      end
       waiter
     end
 
