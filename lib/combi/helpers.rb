@@ -2,16 +2,16 @@ require 'timeout'
 
 module Combi
 
-  def self.wait_for(defer, &block)
+  def self.wait_for(defer, options = {}, &block)
+    options[:timeout] ||= 2
+    poll_time = options[:timeout] / 10
     resolved = false
     defer.callback { |response|
       resolved = true
-      puts "responding to block with"
-      puts response
       block.call response
     }
-    Timeout::timeout(2) do
-      sleep 0.1 while !resolved
+    Timeout::timeout(options[:timeout]) do
+      sleep poll_time while !resolved
     end
   end
 
