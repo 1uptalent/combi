@@ -6,7 +6,7 @@ module Combi
       EM::error_handler do |error|
         STDERR << "ERROR IN EM\n"
         STDERR << "\t#{error.inspect}"
-        STDERR << error.backtrace << "\n"
+        STDERR << "\t#{error.backtrace.join("\t\n")}" << "\n"
       end
       log "-EM.start- the reactor is running: #{EM::reactor_running?}"
       raise "EM did not shut down" if EM::reactor_running?
