@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
   s.authors     = ["German Del Zotto"]
   s.email       = 'germ@ndz.com.ar'
   s.files       = ["lib/combi.rb"]
-  s.homepage    = 'http://rubygems.org/gems/combi'
+  s.homepage    = 'https://github.com/1uptalent/combi'
   s.license     = 'MIT'
   s.add_dependency 'yajl-ruby', '~> 1.2.0'
   s.add_development_dependency 'rspec-given', '~> 3.5.4'
