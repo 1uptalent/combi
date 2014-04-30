@@ -3,7 +3,7 @@ require 'combi/buses/bus'
 module Combi
   class InProcess < Bus
 
-    def request(handler_name, kind, message, options = {}, &block)
+    def request(handler_name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       handler = memory_handlers[handler_name.to_s]
       return if handler.nil?
@@ -30,7 +30,6 @@ module Combi
         log "other ERROR"
         log e.inspect
       end
-
       waiter
     end
 
