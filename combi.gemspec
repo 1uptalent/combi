@@ -4,11 +4,12 @@ require 'combi/version'
 Gem::Specification.new do |s|
   s.name        = 'combi'
   s.version     = Combi::VERSION
-  s.summary     = "Mini Bus for microservices"
-  s.description = "Provides implementation for in process, amqp or web socket service bus"
-  s.authors     = ["German Del Zotto"]
-  s.email       = 'germ@ndz.com.ar'
-  s.files       = ["lib/combi.rb"]
+  s.summary     = 'Mini Bus for microservices'
+  s.description = 'Provides implementation for in process, amqp or web socket service bus'
+  s.authors     = ['German Del Zotto', 'Abel Muiño']
+  s.email       = ['germ@ndz.com.ar', 'amuino@1uptalent.com']
+  s.files       = `git ls-files`.split("\n")
+  s.require_paths = ['lib']
   s.homepage    = 'https://github.com/1uptalent/combi'
   s.license     = 'MIT'
   s.add_dependency 'yajl-ruby', '~> 1.2.0'
