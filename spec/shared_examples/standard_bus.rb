@@ -20,6 +20,15 @@ shared_examples_for "standard_bus" do
     end
   end
 
+  Given(:echo_service) do
+    Module.new do
+      def actions; [:echo_this]; end
+      def do_it(params)
+        params['data']
+      end
+    end
+  end
+
   Given(:finalize) do
     provider.stop!
     consumer.stop!
@@ -59,4 +68,53 @@ shared_examples_for "standard_bus" do
       end
     end
   end
+
+  context 'return the same data type returned by service' do
+    Given(:result_container) { {} }
+    Given(:params) { { data: data } }
+    When(:service) { provider.add_service echo_service }
+    When('service is called') do
+      em do
+        prepare
+        EM.synchrony do
+          result_container[:result] = EM::Synchrony.sync consumer.request(:echo_this, :do_it, params)
+          done
+          finalize
+        end
+      end
+    end
+
+    context 'for string' do
+      Given(:data) { "a simple string" }
+      Then { result_container[:result].should eq data}
+    end
+
+    context 'for numbers' do
+      Given(:data) { 237.324 }
+      Then { result_container[:result].should eq data}
+    end
+
+    context 'for arrays' do
+      Given(:data) { [1, 2, 3.0, "4", "cinco"]}
+      Then { result_container[:result].should eq data}
+    end
+
+    context 'for symbols' do
+      Given(:data) { :some_symbol }
+      Then { result_container[:result].should eq data}
+    end
+
+    context 'for maps' do
+      Given(:data) { {'a' => 1, 'b' => 'dos'} }
+      Then { result_container[:result].should eq data}
+    end
+
+    context 'for objects' do
+      Given(:custom_class) {Class.new do def initialize(val); @val=val;end;end;}
+      Given(:data) { custom_class.new('value') }
+      Then { result_container[:result].should eq data}
+    end
+
+  end
+
 end
