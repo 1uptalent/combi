@@ -22,7 +22,7 @@ module Combi
 
     def log(message)
       return unless @debug_mode ||= ENV['DEBUG'] == 'true'
-      puts "#{object_id} #{self.class.name} #{message}"
+      puts "#{Time.now.to_f} #{self.class.name} #{message}"
     end
 
     def start
@@ -53,7 +53,10 @@ module Combi
 
     def publish(*args, &block)
       args[0] = args[0].to_json unless args[0].is_a? String
-      @exchange.publish *args, &block
+      @exchange.publish *args do
+        log "Sent to network drivers: #{args.inspect}"
+        block.call if block_given?
+      end
     end
 
     def queue(name, options = {}, &block)

@@ -46,6 +46,7 @@ module Combi
     end
 
     def request(name, kind, message, options = {})
+      log "Preparing request: #{name}.#{kind} #{message.inspect}\t|| #{options.inspect}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       options[:routing_key] = name.to_s
       correlation_id = rand(10_000_000).to_s
