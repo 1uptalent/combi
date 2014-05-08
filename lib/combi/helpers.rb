@@ -4,14 +4,15 @@ module Combi
 
   def self.wait_for(defer, options = {}, &block)
     options[:timeout] ||= 2
-    poll_time = options[:timeout] / 10
     resolved = false
+    waiter_thread = Thread.current
     defer.callback { |response|
       resolved = true
       block.call response
+      waiter_thread.wakeup
     }
     Timeout::timeout(options[:timeout]) do
-      sleep poll_time while !resolved
+      Thread.stop
     end
   end
 
