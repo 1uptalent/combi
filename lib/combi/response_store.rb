@@ -29,14 +29,14 @@ module Combi
     def self.wait_for(key, response_store, timeout)
       t1 = Time.now
       log "started waiting for #{key}"
-      waiter = new(key, response_store, timeout, Combi::Bus::RPC_MAX_POLLS)
+      waiter = new(key, response_store, timeout)
       response_store.add_waiter(key, waiter)
       waiter.callback {|r| log "success waiting for #{key}: #{Time.now.to_f - t1.to_f}s" }
       waiter.errback {|r| log "failed waiting for #{key}: #{Time.now.to_f - t1.to_f}s, #{r.inspect}" }
       waiter
     end
 
-    def initialize(key, response_store, timeout, max_polls)
+    def initialize(key, response_store, timeout)
       self.timeout(timeout, RuntimeError.new(Timeout::Error))
     end
 

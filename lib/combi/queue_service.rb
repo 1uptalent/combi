@@ -4,9 +4,6 @@ require 'amqp/utilities/event_loop_helper'
 module Combi
   class QueueService
 
-    RPC_DEFAULT_TIMEOUT = 1
-    RPC_WAIT_PERIOD = 0.01
-
     attr_accessor :rpc_callback
 
     def initialize(config, options)

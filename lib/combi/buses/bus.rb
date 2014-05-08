@@ -7,7 +7,6 @@ module Combi
     attr_reader :services
 
     RPC_DEFAULT_TIMEOUT = 1
-    RPC_MAX_POLLS = 10
 
     def initialize(options)
       @options = options
