@@ -49,7 +49,7 @@ module Combi
       log "Preparing request: #{name}.#{kind} #{message.inspect}\t|| #{options.inspect}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       options[:routing_key] = name.to_s
-      correlation_id = rand(10_000_000).to_s
+      correlation_id = Combi::Correlation.generate
       options[:correlation_id] = correlation_id
       waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
       queue_service.ready do

@@ -212,7 +212,7 @@ module Combi
         kind: kind,
         payload: message
       }
-      correlation_id = rand(10_000_000).to_s
+      correlation_id = Combi::Correlation.generate
       msg[:correlation_id] = correlation_id
       waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
       @ready.callback do |r|

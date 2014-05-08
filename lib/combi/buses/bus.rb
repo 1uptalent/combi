@@ -1,4 +1,5 @@
 require "combi/service"
+require_relative 'correlation'
 require 'yajl'
 require 'yajl/json_gem' # for object.to_json, JSON.parse, etc...
 
