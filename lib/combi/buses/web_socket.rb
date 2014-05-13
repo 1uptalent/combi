@@ -67,7 +67,7 @@ module Combi
         ws.on :open do |event|
           @bus.log "OPEN"
           @bus.log "HANDLER #{@handler.inspect}"
-          @handler.on_open
+          @handler.on_open if @handler.respond_to?(:on_open)
           @bus.ready.succeed
         end
 
@@ -79,6 +79,7 @@ module Combi
 
         ws.on :close do |event|
           @bus.log  "close #{event.code}: #{event.reason}"
+          @handler.on_close if @handler.respond_to?(:on_close)
           @ws = ws = nil
         end
 
