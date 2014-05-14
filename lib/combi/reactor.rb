@@ -14,8 +14,6 @@ module Combi
         log "------- starting EM reactor"
         EM::run do
           log "------- reactor started"
-          Signal.trap("INT")  { EM::stop_event_loop }
-          Signal.trap("TERM") { EM::stop_event_loop }
           block.call unless block.nil?
         end
         log "------- reactor stopped"
