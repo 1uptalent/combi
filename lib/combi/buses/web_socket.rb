@@ -170,7 +170,11 @@ module Combi
       kind = message['kind']
       payload = message['payload'] || {}
       payload['session'] = session
-      response = invoke_service(service_name, kind, payload)
+      begin
+        response = invoke_service(service_name, kind, payload)
+      rescue Exception => e
+        response = {error: true, message: e.message}
+      end
 
       msg = {result: 'ok', correlation_id: message['correlation_id']}
 

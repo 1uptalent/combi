@@ -29,6 +29,15 @@ shared_examples_for "standard_bus" do
     end
   end
 
+  Given(:broken_service) do
+    Module.new do
+      def actions; [:shout_error]; end
+      def do_it(params)
+        raise params['message']
+      end
+    end
+  end
+
   Given(:finalize) do
     provider.stop!
     consumer.stop!
@@ -124,7 +133,22 @@ shared_examples_for "standard_bus" do
       Given(:data) { custom_class.new(custom_json).to_json}
       Then { result_container[:result].should eq JSON.parse(custom_json.to_json)}
     end
-
   end
 
+  context 'return something when service raise an error' do
+    Given(:error_message) { 'service is broken' }
+    When(:service) { provider.add_service broken_service }
+    Then do
+      em do
+        prepare
+        EM.synchrony do
+          service_result = EM::Synchrony.sync consumer.request(:shout_error, :do_it, {message: error_message}, { timeout: 0.1 })
+          service_result['error'].should be_true
+          service_result['message'].should eq error_message
+          done
+          finalize
+        end
+      end
+    end
+  end
 end

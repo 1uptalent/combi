@@ -26,9 +26,10 @@ module Combi
       rescue Timeout::Error => e
         log "ERROR"
         waiter.fail RuntimeError.new(Timeout::Error)
-      rescue e
+      rescue Exception => e
         log "other ERROR"
         log e.inspect
+        waiter.fail({'error' => true, 'message' => e.message})
       end
       waiter
     end

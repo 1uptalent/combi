@@ -69,7 +69,11 @@ module Combi
         return
       end
       log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect}"
-      response = service_instance.send(kind, payload)
+      begin
+        response = service_instance.send(kind, payload)
+      rescue Exception => e
+        response = {error: true, message: e.message}
+      end
 
       if response.respond_to? :succeed
         log "response is deferred"

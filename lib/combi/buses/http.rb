@@ -54,7 +54,11 @@ module Combi
         kind = message['kind']
         if service_instance.respond_to? kind
           message['payload'] ||= {}
-          response = service_instance.send(kind, message['payload'])
+          begin
+            response = service_instance.send(kind, message['payload'])
+          rescue Exception => e
+            response = {error: true, message: e.message}
+          end
           {result: 'ok', response: response}
         end
       end
