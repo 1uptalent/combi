@@ -52,7 +52,6 @@ module Combi
     end
 
     def publish(*args, &block)
-      args[0] = args[0].to_json unless args[0].is_a? String
       @exchange.publish *args, &block
     end
 
@@ -95,7 +94,7 @@ module Combi
         payload: message,
         options: {}
       }
-      publish(request, options)
+      publish(request.to_json, options)
     end
 
   end

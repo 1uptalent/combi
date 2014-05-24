@@ -14,7 +14,7 @@ module Combi
       correlation_id = response['correlation_id']
       waiter = @waiters[correlation_id]
       response = response['response']
-      waiter.succeed(response)
+      waiter.succeed(JSON.parse response)
       @waiters.delete correlation_id
     end
   end

@@ -99,9 +99,9 @@ shared_examples_for "standard_bus" do
       Then { result_container[:result].should eq data}
     end
 
-    context 'for symbols' do
+    context 'for symbols always return a string' do
       Given(:data) { :some_symbol }
-      Then { result_container[:result].should eq data}
+      Then { result_container[:result].should eq data.to_s}
     end
 
     context 'for maps' do
@@ -109,10 +109,20 @@ shared_examples_for "standard_bus" do
       Then { result_container[:result].should eq data}
     end
 
-    context 'for objects' do
-      Given(:custom_class) {Class.new do def initialize(val); @val=val;end;end;}
-      Given(:data) { custom_class.new('value') }
-      Then { result_container[:result].should eq data}
+    context 'for objects returns their json version' do
+      Given(:custom_json) { {val: 'value'} }
+      Given(:custom_class) do
+        Class.new do
+          def initialize(custom_json)
+            @custom_json = custom_json
+          end
+          def to_json
+            @custom_json
+          end
+        end
+      end
+      Given(:data) { custom_class.new(custom_json).to_json}
+      Then { result_container[:result].should eq JSON.parse(custom_json.to_json)}
     end
 
   end
