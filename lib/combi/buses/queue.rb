@@ -75,11 +75,11 @@ module Combi
         log "response is deferred"
         response.callback do |service_response|
           log "responding with deferred answer: #{service_response.inspect}"
-          queue_service.respond(service_response, delivery_info)
+          queue_service.respond(service_response.to_json, delivery_info)
         end
       else
         log "responding with inmediate answer: #{response.inspect}"
-        queue_service.respond(response, delivery_info) unless response.nil?
+        queue_service.respond(response.to_json, delivery_info) unless response.nil?
       end
     end
 

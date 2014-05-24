@@ -176,11 +176,11 @@ module Combi
 
       if response.respond_to? :succeed
         response.callback do |service_response|
-          msg[:response] = service_response
+          msg[:response] = service_response.to_json
           ws.send(msg.to_json)
         end
       else
-        msg[:response] = response
+        msg[:response] = response.to_json
         ws.send(msg.to_json)
       end
     end
