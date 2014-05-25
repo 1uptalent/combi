@@ -26,12 +26,32 @@ describe "in a multi bus environment" do
       def do_it(params)
         defer = EventMachine::DefaultDeferrable.new
         EM.synchrony do
-          req = @other_client.request(:say_hello, :do_it, params, timeout: 3)
+          service_name = params ['service_name'] || :say_hello
+          req = @other_client.request(service_name, :do_it, params, timeout: 0.1)
           service_result = EM::Synchrony.sync req
-          defer.succeed(service_result*2)
+          if service_result.is_a? RuntimeError
+            if @other_client.is_a?(Combi::Queue) && service_result.message == "Timeout::Error"
+              defer.succeed({'error' => true, 'message' => 'other service failed'})
+            else
+              defer.succeed({'error' => true, 'message' => 'unknown error'})
+            end
+          else
+            if service_result.respond_to?(:keys) && service_result['error'] == true
+              defer.succeed({'error' => true, 'message' => 'other service failed'})
+            else
+              defer.succeed(service_result*2)
+            end
+          end
         end
         defer
       end
+    end
+  end
+
+  Given(:broken_service) do
+    Module.new do
+      def actions; [:say_hello_if_you_can]; end
+      def do_it(params); puts "raising error"; raise "I can't talk" ; end
     end
   end
 
@@ -68,10 +88,8 @@ describe "in a multi bus environment" do
     RabbitmqServer.instance.stop! if ENV['CLEAN']
   }
 
-  Given(:options) { {timeout: 3} }
+  Given(:options) { {timeout: 0.5} }
 
-  Given(:service_for_main_bus) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer) }
-  Given(:service_for_internal_bus)   { internal_bus_provider.add_service boring_salutation_service }
   When(:params) { { who: 'world' } }
   When(:expected_result) { "Hello worldHello world" }
 
@@ -111,28 +129,78 @@ describe "in a multi bus environment" do
           end
         end
 
-        Then do
-          em do
-            service_for_main_bus
-            service_for_internal_bus
-            main_bus_provider.start!
-            internal_bus_provider.start!
-            send("#{main}_server")
-            send("#{internal}_server")
-            main_bus_consumer.start!
-            internal_bus_consumer.start!
+        Given(:prepare) do
+          service_for_main_bus
+          start_internal = service_for_internal_bus
+          main_bus_provider.start!
+          internal_bus_provider.start! if start_internal
+          send("#{main}_server")
+          send("#{internal}_server")
+          main_bus_consumer.start!
+          internal_bus_consumer.start! if start_internal
+        end
 
-            EM.synchrony do
-              service_result = EM::Synchrony.sync main_bus_consumer.request(:repeat_with_me, :do_it, params, options)
-              service_result.should eq expected_result
-              done
-              main_bus_provider.stop!
-              internal_bus_provider.stop!
-              main_bus_consumer.stop!
-              internal_bus_consumer.stop!
+        Given(:finalize) do
+          main_bus_provider.stop!
+          internal_bus_provider.stop!
+          main_bus_consumer.stop!
+          internal_bus_consumer.stop!
+        end
+
+        context "both services are working ok" do
+          Given(:service_for_main_bus) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer); true }
+          Given(:service_for_internal_bus) { internal_bus_provider.add_service boring_salutation_service; true }
+
+          Then do
+            em do
+              prepare
+              EM.synchrony do
+                service_result = EM::Synchrony.sync main_bus_consumer.request(:repeat_with_me, :do_it, params, options)
+                service_result.should eq expected_result
+                done
+                finalize
+              end
             end
           end
         end
+
+        context "the external service raise an error" do
+          Given(:service_for_main_bus) { main_bus_provider.add_service broken_service; true }
+          Given(:service_for_internal_bus) { false }
+
+          Then do
+            em do
+              prepare
+              EM.synchrony do
+                service_result = EM::Synchrony.sync main_bus_consumer.request(:say_hello_if_you_can, :do_it, params, options)
+                service_result['error'].should be_true
+                service_result['message'].should eq "I can't talk"
+                done
+                finalize
+              end
+            end
+          end
+        end
+
+        context "the internal service raise an error" do
+          Given(:service_for_main_bus) { main_bus_provider.add_service composed_service_class.new(internal_bus_consumer); true }
+          Given(:service_for_internal_bus) { main_bus_provider.add_service broken_service; true }
+
+          Then do
+            em do
+              prepare
+              EM.synchrony do
+                params.merge!('service_name' => 'say_hello_if_you_can')
+                service_result = EM::Synchrony.sync main_bus_consumer.request(:repeat_with_me, :do_it, params, options)
+                service_result['error'].should be_true
+                service_result['message'].should eq 'other service failed'
+                done
+                finalize
+              end
+            end
+          end
+        end
+
       end
     end
   end
