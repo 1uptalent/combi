@@ -61,6 +61,8 @@ module Combi
           end
           {result: 'ok', response: response}
         end
+      else
+        {result: 'error', response: {error: true, message: 'unknown service'}}
       end
     end
 

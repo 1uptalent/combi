@@ -201,6 +201,7 @@ module Combi
       else
         log "[WARNING] Service #{service_name} not found"
         log "[WARNING] handlers: #{handlers.keys.inspect}"
+        response = {error: true, message: 'unknown service'}
       end
     end
 

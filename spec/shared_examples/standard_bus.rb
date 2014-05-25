@@ -151,4 +151,28 @@ shared_examples_for "standard_bus" do
       end
     end
   end
+
+  context 'return an error when requesting an unknown service' do
+    Given(:error_message) { 'unknown service' }
+    When(:service) { provider.add_service broken_service }
+    Then do
+      em do
+        prepare
+        EM.synchrony do
+          begin
+            service_result = EM::Synchrony.sync consumer.request(:some_not_service, :do_it, {}, { timeout: 0.1 })
+            if service_result.is_a? RuntimeError
+              consumer.class.should eq Combi::Queue
+              service_result.message.should eq "Timeout::Error"
+            else
+              service_result['error'].should be_true
+              service_result['message'].should eq error_message
+            end
+            done
+            finalize
+          end
+        end
+      end
+    end
+  end
 end
