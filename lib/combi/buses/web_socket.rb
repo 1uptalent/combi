@@ -23,7 +23,7 @@ module Combi
       end
 
       def on_message(ws, session, raw_message)
-        @bus.log "ON MESSAGE #{raw_message}"
+        @bus.log "ON MESSAGE #{raw_message[0..500]}"
         message = JSON.parse(raw_message)
         @bus.on_message(ws, message, session)
       end
@@ -72,7 +72,7 @@ module Combi
         end
 
         ws.on :message do |event|
-          @bus.log "ON MESSAGE: #{event.data}"
+          @bus.log "ON MESSAGE: #{event.data[0..500]}"
           message = JSON.parse(event.data)
           @bus.on_message(ws, message)
         end
@@ -163,7 +163,7 @@ module Combi
     def on_message(ws, message, session = nil)
       if message['correlation_id'] && message.has_key?('result')
         @response_store.handle_rpc_response(message)
-        log "Stored message with correlation_id #{message['correlation_id']} - #{message.inspect}"
+        log "Stored message with correlation_id #{message['correlation_id']} - #{message.inspect[0..500]}"
         return
       end
       service_name = message['service']

@@ -46,14 +46,14 @@ module Combi
     end
 
     def request(name, kind, message, options = {})
-      log "Preparing request: #{name}.#{kind} #{message.inspect}\t|| #{options.inspect}"
+      log "Preparing request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       options[:routing_key] = name.to_s
       correlation_id = Combi::Correlation.generate
       options[:correlation_id] = correlation_id
       waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
       queue_service.ready do
-        log "Making request: #{name}.#{kind} #{message.inspect}\t|| #{options.inspect}"
+        log "Making request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect[0..500]}"
         queue_service.call(kind, message, options)
       end
       waiter
@@ -68,7 +68,7 @@ module Combi
         log "Service instance does not respond to #{kind}: #{service_instance.inspect}"
         return
       end
-      log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect}"
+      log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
       begin
         response = service_instance.send(kind, payload)
       rescue Exception => e
@@ -78,11 +78,11 @@ module Combi
       if response.respond_to? :succeed
         log "response is deferred"
         response.callback do |service_response|
-          log "responding with deferred answer: #{service_response.inspect}"
+          log "responding with deferred answer: #{service_response.inspect[0..500]}"
           queue_service.respond(service_response.to_json, delivery_info)
         end
       else
-        log "responding with inmediate answer: #{response.inspect}"
+        log "responding with inmediate answer: #{response.inspect[0..500]}"
         queue_service.respond(response.to_json, delivery_info) unless response.nil?
       end
     end
