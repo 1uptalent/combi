@@ -11,12 +11,15 @@ module Combi
       log "-EM.start- the reactor is running: #{EM::reactor_running?}"
       raise "EM did not shut down" if EM::reactor_running?
       @@reactor_thread = Thread.new do
-        log "------- starting EM reactor"
-        EM::run do
-          log "------- reactor started"
-          block.call unless block.nil?
+        begin
+          log "------- starting EM reactor"
+          EM::run do
+            log "------- reactor started"
+            block.call unless block.nil?
+          end
+        ensure
+          puts "------- reactor stopped"
         end
-        log "------- reactor stopped"
       end
       30.times do
         sleep 0.1 unless EM::reactor_running?
