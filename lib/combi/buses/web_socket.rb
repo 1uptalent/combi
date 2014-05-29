@@ -200,6 +200,7 @@ module Combi
           response = service_instance.send(kind, payload)
         else
           log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
+          response = {error: true, message: 'unknown action'}
         end
       else
         log "[WARNING] Service #{service_name} not found"

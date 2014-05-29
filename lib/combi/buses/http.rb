@@ -60,6 +60,8 @@ module Combi
             response = {error: true, message: e.message}
           end
           {result: 'ok', response: response}
+        else
+          {result: 'error', response: {error: true, message: 'unknown action'}}
         end
       else
         {result: 'error', response: {error: true, message: 'unknown service'}}

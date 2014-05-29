@@ -175,4 +175,23 @@ shared_examples_for "standard_bus" do
       end
     end
   end
+
+  context 'return an error when requesting an unknown action for the service' do
+    Given(:error_message) { 'unknown action' }
+    When(:service) { provider.add_service echo_service }
+    Then do
+      em do
+        prepare
+        EM.synchrony do
+          begin
+            service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
+            service_result['error'].should be_true
+            service_result['message'].should eq error_message
+            done
+            finalize
+          end
+        end
+      end
+    end
+  end
 end

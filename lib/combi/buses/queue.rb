@@ -64,17 +64,17 @@ module Combi
       kind = message['kind']
       payload = message['payload']
       options = message['options']
-      unless service_instance.respond_to?(kind)
+      if service_instance.respond_to?(kind)
+        log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
+        begin
+          response = service_instance.send(kind, payload)
+        rescue Exception => e
+          response = {error: true, message: e.message}
+        end
+      else
         log "Service instance does not respond to #{kind}: #{service_instance.inspect}"
-        return
+        response = {error: true, message: 'unknown action'}
       end
-      log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
-      begin
-        response = service_instance.send(kind, payload)
-      rescue Exception => e
-        response = {error: true, message: e.message}
-      end
-
       if response.respond_to? :succeed
         log "response is deferred"
         response.callback do |service_response|
