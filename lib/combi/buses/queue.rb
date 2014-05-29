@@ -25,8 +25,8 @@ module Combi
       end
     end
 
-    def respond_to(service_instance, handler, options = {})
-      log "registering #{handler}"
+    def respond_to(service_instance, action, options = {})
+      log "registering #{action}"
       queue_options = {}
       subscription_options = {}
       if options[:fast] == true
@@ -35,8 +35,8 @@ module Combi
         subscription_options[:ack] = true
       end
       queue_service.ready do
-        queue_service.queue(handler.to_s, queue_options) do |queue|
-          log "subscribing to queue #{handler.to_s} with options #{queue_options}"
+        queue_service.queue(action.to_s, queue_options) do |queue|
+          log "subscribing to queue #{action.to_s} with options #{queue_options}"
           queue.subscribe(subscription_options) do |delivery_info, payload|
             respond service_instance, payload, delivery_info
             queue_service.acknowledge delivery_info unless options[:fast] == true

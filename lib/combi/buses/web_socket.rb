@@ -208,9 +208,9 @@ module Combi
       end
     end
 
-    def respond_to(service_instance, handler, options = {})
-      log "registering #{handler}"
-      handlers[handler.to_s] = {service_instance: service_instance, options: options}
+    def respond_to(service_instance, action, options = {})
+      log "registering #{action}"
+      handlers[action.to_s] = {service_instance: service_instance, options: options}
       log "handlers: #{handlers.keys.inspect}"
     end
 

@@ -37,8 +37,8 @@ module Combi
       waiter
     end
 
-    def respond_to(service_instance, handler, options = {})
-      memory_handlers[handler.to_s] = {service_instance: service_instance, options: options}
+    def respond_to(service_instance, action, options = {})
+      memory_handlers[action.to_s] = {service_instance: service_instance, options: options}
     end
 
     def memory_handlers
