@@ -50,7 +50,6 @@ module Combi
 
     def publish(*args, &block)
       @exchange.publish *args do
-        log "Sent to network drivers: #{args.inspect}"
         block.call if block_given?
       end
     end
