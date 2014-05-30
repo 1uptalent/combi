@@ -173,7 +173,7 @@ module Combi
       begin
         response = invoke_service(service_name, kind, payload)
       rescue Exception => e
-        response = {error: true, message: e.message}
+        response = {error: {message: e.message, backtrace: e.backtrace } }
       end
 
       msg = {result: 'ok', correlation_id: message['correlation_id']}
@@ -183,6 +183,12 @@ module Combi
         response.callback do |service_response|
           log "responding with deferred answer: #{service_response.inspect[0..500]}"
           msg[:response] = service_response.to_json
+          ws.send(msg.to_json)
+        end
+        response.errback do |service_response|
+          log "responding with deferred error: #{service_response.inspect[0..500]}"
+          error_response = { error: service_response }
+          msg[:response] = error_response.to_json
           ws.send(msg.to_json)
         end
       else
@@ -200,12 +206,12 @@ module Combi
           response = service_instance.send(kind, payload)
         else
           log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
-          response = {error: true, message: 'unknown action'}
+          response = {error: 'unknown action'}
         end
       else
         log "[WARNING] Service #{service_name} not found"
         log "[WARNING] handlers: #{handlers.keys.inspect}"
-        response = {error: true, message: 'unknown service'}
+        response = {error: 'unknown service'}
       end
     end
 

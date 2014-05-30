@@ -13,6 +13,13 @@ class DeferrableBody
         self.succeed
       end
     end
+    @defer.errback do |service_response|
+      error_response = { error: service_response }
+      EM::next_tick do
+        self.call [{result: 'ok', response: error_response}.to_json]
+        self.fail
+      end
+    end
   end
 
   def each(&block)

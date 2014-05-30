@@ -8,7 +8,7 @@ module Combi
       handler = memory_handlers[handler_name.to_s]
       waiter = EventMachine::DefaultDeferrable.new
       if handler.nil?
-        waiter.fail('error' => true, 'message' => 'unknown service')
+        waiter.fail('error' => 'unknown service')
       else
         service_instance = handler[:service_instance]
         message = JSON.parse(message.to_json)
@@ -19,22 +19,25 @@ module Combi
               response = service_instance.send(kind, message)
               if response.respond_to? :succeed
                 response.callback do |service_response|
+                  log "responding with deferred response: #{service_response.inspect[0..500]}"
                   waiter.succeed service_response
+                end
+                response.errback do |service_response|
+                  failure_response = { 'error' => service_response }
+                  log "responding with deferred failure: #{service_response.inspect[0..500]}"
+                  waiter.fail(failure_response)
                 end
               else
                 waiter.succeed response
               end
             end
           rescue Timeout::Error => e
-            log "ERROR"
-            waiter.fail RuntimeError.new(Timeout::Error)
+            waiter.fail Timeout::Error.new
           rescue Exception => e
-            log "other ERROR"
-            log e.inspect
-            waiter.fail({'error' => true, 'message' => e.message})
+            waiter.fail 'error' => { 'message' => e.message, 'backtrace' => e.backtrace}
           end
         else
-          waiter.fail('error' => true, 'message' => 'unknown action')
+          waiter.fail('error' => 'unknown action')
         end
       end
       waiter

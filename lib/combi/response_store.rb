@@ -15,8 +15,13 @@ module Combi
     def handle_rpc_response(response)
       correlation_id = response['correlation_id']
       waiter = @waiters[correlation_id]
-      response = response['response']
-      waiter.succeed(JSON.parse response) if waiter.respond_to? :succeed
+      return unless waiter
+      response = JSON.parse response['response']
+      if response.respond_to?(:keys) and response['error']
+        waiter.fail(response)
+      else
+        waiter.succeed(response)
+      end
     end
 
     def finish(key)

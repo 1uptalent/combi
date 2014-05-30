@@ -57,14 +57,14 @@ module Combi
           begin
             response = service_instance.send(kind, message['payload'])
           rescue Exception => e
-            response = {error: true, message: e.message}
+            response = {error: {message: e.message, backtrace: e.backtrace } }
           end
           {result: 'ok', response: response}
         else
-          {result: 'error', response: {error: true, message: 'unknown action'}}
+          {result: 'error', response: {error: 'unknown action'}}
         end
       else
-        {result: 'error', response: {error: true, message: 'unknown service'}}
+        {result: 'error', response: {error: 'unknown service'}}
       end
     end
 
@@ -84,7 +84,8 @@ module Combi
       url = "#{@options[:remote_api]}#{name}/#{kind}"
       request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message.to_json)
       request_async.callback do |r|
-        waiter.succeed(JSON.parse(r.response)['response'])
+        parsed = JSON.parse(r.response)
+        waiter.succeed(parsed['response'])
       end
       request_async.errback do |x|
         waiter.fail(RuntimeError.new(Timeout::Error))

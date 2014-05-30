@@ -59,7 +59,7 @@ shared_examples_for "standard_bus" do
     end
   end
 
-  context 'raises Timeout::Error when the response is slow' do
+  context 'fails with error => Timeout::Error when the response is slow' do
     Given(:time_base) { 0.01 }
     When(:params) { { time: time_base*4 } }
     When(:service) { provider.add_service slow_service }
@@ -67,10 +67,9 @@ shared_examples_for "standard_bus" do
       em do
         prepare
         EM.synchrony do
-          expect do
-            service_result = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: time_base/2.0 })
-            raise Kernel.const_get(service_result.message) if service_result.is_a? Exception
-          end.to raise_error Timeout::Error
+          service_result = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: time_base/2.0 })
+          service_result.should be_an Exception
+          service_result.message.should eq 'Timeout::Error'
           done(time_base) #timeout response must came before this timeout
         end
         finalize
@@ -143,8 +142,10 @@ shared_examples_for "standard_bus" do
         prepare
         EM.synchrony do
           service_result = EM::Synchrony.sync consumer.request(:shout_error, :do_it, {message: error_message}, { timeout: 0.1 })
-          service_result['error'].should be_true
-          service_result['message'].should eq error_message
+          service_result['error'].should be_a Hash
+          service_result['error']['message'].should eq error_message
+          service_result['error']['backtrace'].should_not be_nil
+          service_result['error']['backtrace'].should be_an Array
           done
           finalize
         end
@@ -165,8 +166,7 @@ shared_examples_for "standard_bus" do
               consumer.class.should eq Combi::Queue
               service_result.message.should eq "Timeout::Error"
             else
-              service_result['error'].should be_true
-              service_result['message'].should eq error_message
+              service_result['error'].should eq error_message
             end
             done
             finalize
@@ -185,8 +185,7 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           begin
             service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
-            service_result['error'].should be_true
-            service_result['message'].should eq error_message
+            service_result['error'].should eq error_message
             done
             finalize
           end

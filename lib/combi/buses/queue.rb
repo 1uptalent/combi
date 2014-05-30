@@ -69,17 +69,22 @@ module Combi
         begin
           response = service_instance.send(kind, payload)
         rescue Exception => e
-          response = {error: true, message: e.message}
+          response = {error: { message: e.message, backtrace: e.backtrace } }
         end
       else
         log "Service instance does not respond to #{kind}: #{service_instance.inspect}"
-        response = {error: true, message: 'unknown action'}
+        response = {error: 'unknown action'}
       end
       if response.respond_to? :succeed
         log "response is deferred"
         response.callback do |service_response|
           log "responding with deferred answer: #{service_response.inspect[0..500]}"
           queue_service.respond(service_response.to_json, delivery_info)
+        end
+        response.errback do |service_response|
+          failure_response = { error: service_response }
+          log "responding with deferred failure: #{service_response.inspect[0..500]}"
+          queue_service.respond(failure_response.to_json, delivery_info)
         end
       else
         log "responding with inmediate answer: #{response.inspect[0..500]}"
