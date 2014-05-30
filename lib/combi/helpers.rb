@@ -9,6 +9,12 @@ module Combi
       block.call response
       waiter_thread.wakeup
     }
+    defer.errback { |response|
+      log "waiting for result, received an error"
+      log response
+      block.call error: true, message: 'service request error'
+      waiter_thread.wakeup
+    }
     Timeout::timeout(options[:timeout]) do
       Thread.stop
     end
