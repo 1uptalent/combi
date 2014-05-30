@@ -88,7 +88,7 @@ module Combi
         waiter.succeed(parsed['response'])
       end
       request_async.errback do |x|
-        waiter.fail(RuntimeError.new(Timeout::Error))
+        waiter.fail(Timeout::Error.new)
       end
       waiter
     end
