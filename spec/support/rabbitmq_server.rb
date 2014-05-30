@@ -27,7 +27,9 @@ class RabbitmqServer
   end
 
   def start_forwarder!
-    @forwarder_pid = Process.spawn '/usr/local/bin/boot2docker', 'ssh', '-L',  "#{port}:localhost:#{port}", '-N'
+    command = "/usr/local/bin/boot2docker ssh -L #{port}:localhost:#{port} -N"
+    return if @_command_running ||= `ps`.include?(command)
+    @forwarder_pid = Process.spawn command
     #Process.detach @forwarder_pid
     puts "starting forwarder pid: #{@forwarder_pid}"
   end
@@ -53,14 +55,16 @@ class RabbitmqServer
 
   def is_port_open?(ip, port, timeout = 15)
     begin
+      service = "rabbit @ #{ip}##{port}"
       Timeout::timeout(timeout) do
         begin
           s = TCPSocket.new(ip, port)
           s.close
           return true
         rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
-          puts "conn error to rabbit @ #{ip}##{port}"
+          puts "conn error to #{service}"
           sleep 1
+          puts "\tretrying connection to #{service}"
           retry
         end
       end

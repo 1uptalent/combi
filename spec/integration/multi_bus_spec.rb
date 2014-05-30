@@ -51,7 +51,7 @@ describe "in a multi bus environment" do
   Given(:broken_service) do
     Module.new do
       def actions; [:say_hello_if_you_can]; end
-      def do_it(params); puts "raising error"; raise "I can't talk" ; end
+      def do_it(params); raise "I can't talk" ; end
     end
   end
 

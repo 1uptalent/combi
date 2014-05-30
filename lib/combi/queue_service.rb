@@ -43,9 +43,7 @@ module Combi
     end
 
     def disconnect
-      @amqp_conn.close do
-        puts "disconnected from RABBIT"
-      end
+      @amqp_conn.close
     end
 
     def publish(*args, &block)
