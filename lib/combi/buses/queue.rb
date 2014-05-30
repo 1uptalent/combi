@@ -83,7 +83,7 @@ module Combi
         end
       else
         log "responding with inmediate answer: #{response.inspect[0..500]}"
-        queue_service.respond(response.to_json, delivery_info) unless response.nil?
+        queue_service.respond(response.to_json, delivery_info)
       end
     end
 
