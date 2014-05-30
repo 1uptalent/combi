@@ -20,7 +20,7 @@ module Combi
     end
 
     def finish(key)
-      @waiters.delete correlation_id
+      @waiters.delete key
     end
   end
 
