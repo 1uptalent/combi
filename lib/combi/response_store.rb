@@ -8,6 +8,8 @@ module Combi
 
     def add_waiter(key, waiter)
       @waiters[key] = waiter
+      waiter.callback { |r| finish key }
+      waiter.errback  { |r| finish key }
     end
 
     def handle_rpc_response(response)
@@ -15,6 +17,9 @@ module Combi
       waiter = @waiters[correlation_id]
       response = response['response']
       waiter.succeed(JSON.parse response)
+    end
+
+    def finish(key)
       @waiters.delete correlation_id
     end
   end
