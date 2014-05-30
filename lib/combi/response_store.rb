@@ -16,7 +16,7 @@ module Combi
       correlation_id = response['correlation_id']
       waiter = @waiters[correlation_id]
       response = response['response']
-      waiter.succeed(JSON.parse response)
+      waiter.succeed(JSON.parse response) if waiter.respond_to? :succeed
     end
 
     def finish(key)
