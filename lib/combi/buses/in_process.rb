@@ -13,7 +13,7 @@ module Combi
         service_instance = handler[:service_instance]
         message = JSON.parse(message.to_json)
         if service_instance.respond_to?(kind)
-          waiter.timeout(options[:timeout], RuntimeError.new(Timeout::Error))
+          waiter.timeout(options[:timeout], 'error' => 'Timeout::Error')
           begin
             Timeout.timeout(options[:timeout]) do
               response = service_instance.send(kind, message)
@@ -32,7 +32,7 @@ module Combi
               end
             end
           rescue Timeout::Error => e
-            waiter.fail Timeout::Error.new
+            waiter.fail 'error' => 'Timeout::Error'
           rescue Exception => e
             waiter.fail 'error' => { 'message' => e.message, 'backtrace' => e.backtrace}
           end

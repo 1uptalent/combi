@@ -47,7 +47,7 @@ module Combi
     end
 
     def initialize(key, response_store, timeout)
-      self.timeout(timeout, RuntimeError.new(Timeout::Error))
+      self.timeout(timeout, 'error' => 'Timeout::Error')
     end
 
   end

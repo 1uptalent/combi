@@ -68,8 +68,9 @@ shared_examples_for "standard_bus" do
         prepare
         EM.synchrony do
           service_result = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: time_base/2.0 })
-          service_result.should be_an Exception
-          service_result.message.should eq 'Timeout::Error'
+          service_result.should be_a Hash
+          service_result.should have_key 'error'
+          service_result['error'].should eq 'Timeout::Error'
           done(time_base) #timeout response must came before this timeout
         end
         finalize
@@ -162,9 +163,8 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           begin
             service_result = EM::Synchrony.sync consumer.request(:some_not_service, :do_it, {}, { timeout: 0.1 })
-            if service_result.is_a? RuntimeError
-              consumer.class.should eq Combi::Queue
-              service_result.message.should eq "Timeout::Error"
+            if consumer.class == Combi::Queue
+              service_result['error'].should eq "Timeout::Error"
             else
               service_result['error'].should eq error_message
             end
