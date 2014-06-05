@@ -20,7 +20,6 @@ module Combi
     }
     Timeout::timeout(options[:timeout]) do
       Thread.stop
-      puts "\t AFTER STOP"
       raise ServiceError.new(error_response) if error_response
       block.call success_response
     end
