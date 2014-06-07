@@ -39,6 +39,10 @@ module Combi
         @channel.auto_recovery = true
         @exchange = @channel.direct ''
         after_connect.call
+        connection.on_tcp_connection_loss do |conn, settings|
+          puts "[network failure] Trying to reconnect..."
+          conn.reconnect(false, 2)
+        end
       end
     end
 
