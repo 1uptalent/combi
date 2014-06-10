@@ -80,4 +80,29 @@ describe 'Combi::WebSocket' do
       end
     end
   end
+
+  context "it don't send messages when is not connected" do
+    Then do
+      em do
+        provider.add_service null_service
+        prepare
+        EM::add_timer(0.1) do
+          consumer.stop!
+        end
+        EM::add_timer(0.2) do
+          EM.synchrony do
+            provider.stop!
+            service_result = EM::Synchrony.sync consumer.request(:null, :do_it, {}, { timeout: 0.3 })
+            service_result.should be_a Hash
+            service_result.should have_key 'error'
+            service_result['error'].should eq 'Timeout::Error'
+            done(0.3) #timeout response must came before this timeout
+          end
+          provider.stop!
+          consumer.stop!
+        end
+      end
+    end
+  end
+
 end
