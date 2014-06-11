@@ -45,7 +45,7 @@ class RabbitmqServer
     container_line = `docker ps | grep #{NAME}`
     port_match = container_line.match(/:([0-9]+)->5672/)
     if port_match
-      return port_match[1]
+      return port_match[1].to_i
     else
       puts "Container not running yet, sleeping"
       sleep 0.2
