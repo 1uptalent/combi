@@ -11,9 +11,11 @@ module Combi
       @options = options
       @rpc_queue = nil
       @ready_defer = EventMachine::DefaultDeferrable.new
+      @ready_callbacks = []
     end
 
     def ready(&block)
+      @ready_callbacks << block
       @ready_defer.callback &block
     end
 
@@ -23,25 +25,30 @@ module Combi
     end
 
     def start
+      @config[:on_tcp_connection_failure] = Proc.new { EM.add_timer(4 * rand) { start } }
       connect @config do
         if @options[:rpc] == :enabled
           create_rpc_queue
         else
-          puts "ready"
           @ready_defer.succeed
         end
       end
     end
 
     def connect(config, &after_connect)
-      @amqp_conn = AMQP.connect(config) do |connection, open_ok|
+      puts "[INFO] trying to connect to queue"
+      @amqp_conn = AMQP.start(config) do |connection, open_ok|
         @channel = AMQP::Channel.new @amqp_conn
         @channel.auto_recovery = true
         @exchange = @channel.direct ''
         after_connect.call
         connection.on_tcp_connection_loss do |conn, settings|
-          puts "[network failure] Trying to reconnect..."
-          conn.reconnect(false, 2)
+          puts "[ERROR] Connection failed, resetting for reconnect"
+          @ready_defer = EventMachine::DefaultDeferrable.new
+          @ready_callbacks.each do |callback|
+            @ready_defer.callback &callback
+          end
+          start
         end
       end
     end
