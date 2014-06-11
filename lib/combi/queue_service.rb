@@ -37,7 +37,7 @@ module Combi
 
     def connect(config, &after_connect)
       puts "[INFO] trying to connect to queue"
-      @amqp_conn = AMQP.start(config) do |connection, open_ok|
+      @amqp_conn = AMQP.connect(config) do |connection, open_ok|
         @channel = AMQP::Channel.new @amqp_conn
         @channel.auto_recovery = true
         @exchange = @channel.direct ''
