@@ -234,7 +234,7 @@ module Combi
       @ready.callback do |r|
         web_socket = @machine.ws || options[:ws]
         log "sending request #{msg.inspect}"
-        web_socket.send msg.to_json
+        web_socket.send msg.to_json unless web_socket.nil?
       end
       waiter
     end

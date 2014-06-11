@@ -94,7 +94,7 @@ module Combi
     def call(kind, message, options = {})
       log "sending request #{kind} #{message.inspect[0..500]} with options #{options.inspect}"
       raise "RPC is not enabled or reply_to is not included" if (@rpc_queue.nil? || @rpc_queue.name.nil?) && options[:reply_to].nil?
-      options[:expiration] = (options[:timeout] || RPC_DEFAULT_TIMEOUT) * 1000
+      options[:expiration] = ((options[:timeout] || RPC_DEFAULT_TIMEOUT) * 1000).to_i
       options[:routing_key] ||= 'rcalls_queue'
       options[:reply_to] ||= @rpc_queue.name
       request = {
