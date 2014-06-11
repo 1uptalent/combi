@@ -6,6 +6,12 @@ require 'combi/buses/queue'
 describe 'Combi::Queue' do
   include EventedSpec::SpecHelper
 
+  before(:all) do
+    RabbitmqServer.instance.stop! if ENV['CLEAN']
+    RabbitmqServer.instance.start!
+  end
+  after(:all) { RabbitmqServer.instance.stop! if ENV['CLEAN'] }
+
   context 'can be instanitated via ServiceBus' do
     When(:bus) { Combi::ServiceBus.init_for(:queue, {init_queue: false}) }
     Then { Combi::Queue === bus }
@@ -23,19 +29,48 @@ describe 'Combi::Queue' do
       :frame_max => 131072
     }
   end
-  Given(:provider) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config } ) }
-  Given(:consumer) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config } ) }
+  Given(:provider) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config.merge(role: 'provider') } ) }
+  Given(:consumer) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config.merge(role: 'consumer') } ) }
   Given(:prepare) do
     provider.start!
     consumer.start!
     true
   end
 
-  it_behaves_like 'standard_bus' do
-    before(:all) do
-      RabbitmqServer.instance.stop! if ENV['CLEAN']
-      RabbitmqServer.instance.start!
+  it_behaves_like 'standard_bus'
+
+  Given(:null_service) do
+    Module.new do
+      def actions; [:null]; end
+      def do_it(params)
+        "null"
+      end
     end
-    after(:all) { RabbitmqServer.instance.stop! if ENV['CLEAN'] }
   end
+
+  context "it resist a reconnection" do
+    puts "VERY UNSTABLE TEST"
+    When(:service) { provider.add_service null_service }
+    Then do
+      em do
+        prepare
+        EM::add_timer(0.1) do
+          `killall ssh`
+        end
+        EM::add_timer(0.2) do
+          RabbitmqServer.instance.start_forwarder!
+        end
+        EM::add_timer(2) do
+          EM.synchrony do
+            service_result = EM::Synchrony.sync consumer.request(:null, :do_it, {}, { timeout: 2 })
+            service_result.should eq "null"
+            done
+            provider.stop!
+            consumer.stop!
+          end
+        end
+      end
+    end
+  end
+
 end
