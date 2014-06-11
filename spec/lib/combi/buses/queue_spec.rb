@@ -26,7 +26,8 @@ describe 'Combi::Queue' do
       :vhost     => "/",
       :ssl       => false,
       :heartbeat => 0,
-      :frame_max => 131072
+      :frame_max => 131072,
+      :reconnect_period => 0.5
     }
   end
   Given(:provider) { Combi::ServiceBus.init_for(:queue, { amqp_config: amqp_config.merge(role: 'provider') } ) }
