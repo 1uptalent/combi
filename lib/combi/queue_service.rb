@@ -32,6 +32,7 @@ module Combi
       @config[:reconnect_period] ||= 4
       reconnection_proc = Proc.new { EM.add_timer(@config[:reconnect_period] * rand) { start } }
       @config[:on_tcp_connection_failure] = reconnection_proc
+      @config[:on_possible_authentication_failure] = reconnection_proc
       connect @config do
         if @options[:rpc] == :enabled
           create_rpc_queue
