@@ -19,6 +19,10 @@ module Combi
       @ready_defer.callback &block
     end
 
+    def next_ready_only(&block)
+      @ready_defer.callback &block
+    end
+
     def log(message)
       return unless @debug_mode ||= ENV['DEBUG'] == 'true'
       puts "#{Time.now.to_f} #{self.class.name} #{message}"
