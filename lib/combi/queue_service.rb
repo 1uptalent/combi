@@ -23,6 +23,10 @@ module Combi
       @ready_defer.callback &block
     end
 
+    def status
+      @amqp_conn && @amqp_conn.status
+    end
+
     def log(message)
       return unless @debug_mode ||= ENV['DEBUG'] == 'true'
       puts "#{Time.now.to_f} #{self.class.name} #{message}"
@@ -49,6 +53,13 @@ module Combi
         @channel.auto_recovery = true
         @exchange = @channel.direct ''
         after_connect.call
+        connection.on_error do |conn, connection_close|
+          puts "[amqp connection.close] Reply code = #{connection_close.reply_code}, reply text = #{connection_close.reply_text}"
+          if connection_close.reply_code == 320
+            puts "[amqp connection.close] Setting up a periodic reconnection timer..."
+            reconnect
+          end
+        end
         connection.on_tcp_connection_loss do |conn, settings|
           puts "[ERROR] Connection failed, resetting for reconnect"
           reconnect
