@@ -51,13 +51,17 @@ module Combi
         after_connect.call
         connection.on_tcp_connection_loss do |conn, settings|
           puts "[ERROR] Connection failed, resetting for reconnect"
-          @ready_defer = EventMachine::DefaultDeferrable.new
-          @ready_callbacks.each do |callback|
-            @ready_defer.callback &callback
-          end
-          start
+          reconnect
         end
       end
+    end
+
+    def reconnect
+      @ready_defer = EventMachine::DefaultDeferrable.new
+      @ready_callbacks.each do |callback|
+        @ready_defer.callback &callback
+      end
+      start
     end
 
     def disconnect
