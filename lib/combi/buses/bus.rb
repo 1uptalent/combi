@@ -82,6 +82,15 @@ module Combi
       # convert keys to symbols in-place
       params.keys.each {|key| params[key.to_sym] = params.delete(key) }
       service_instance.send(action, params)
+    rescue => e
+      # TODO: report in a more effective way (I will not read server logs to find this)
+      require 'yaml'
+      puts " *** ERROR INVOKING SERVICE ***"
+      puts "   - #{e.inspect}"
+      puts "   - #{service_instance.class.ancestors.join ' > '}"
+      puts "   - #{action}"
+      puts "   - #{params.to_yaml}"
+      raise e
     end
 
   end
