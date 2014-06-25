@@ -33,11 +33,11 @@ module Combi
             end
           rescue Timeout::Error => e
             waiter.fail 'error' => 'Timeout::Error'
-          rescue Exception => e
-            waiter.fail 'error' => { 'message' => e.message, 'backtrace' => e.backtrace}
+          rescue RuntimeError => e
+            waiter.fail 'error' => {'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace}
           end
         else
-          waiter.fail('error' => 'unknown action')
+          waiter.fail('error' => { 'klass' => 'unknown action', 'message' => kind.to_s })
         end
       end
       waiter

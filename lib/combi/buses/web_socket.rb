@@ -172,8 +172,8 @@ module Combi
       payload['session'] = session
       begin
         response = lookup_and_invoke_service(service_name, kind, payload)
-      rescue Exception => e
-        response = {error: {message: e.message, backtrace: e.backtrace } }
+      rescue RuntimeError => e
+        response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
 
       msg = {result: 'ok', correlation_id: message['correlation_id']}
@@ -206,7 +206,7 @@ module Combi
           response = invoke_service(service_instance, kind, payload)
         else
           log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
-          response = {error: 'unknown action'}
+          response = {error: { klass: 'unknown action', message: kind } }
         end
       else
         log "[WARNING] Service #{service_name} not found"

@@ -185,7 +185,8 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           begin
             service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
-            service_result['error'].should eq error_message
+            service_result['error']['klass'].should eq error_message
+            service_result['error']['message'].should eq 'do_other'
             done
             finalize
           end

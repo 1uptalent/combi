@@ -68,12 +68,12 @@ module Combi
         log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
         begin
           response = invoke_service(service_instance, kind, payload)
-        rescue Exception => e
-          response = {error: { message: e.message, backtrace: e.backtrace } }
+        rescue RuntimeError => e
+          response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
         end
       else
         log "Service instance does not respond to #{kind}: #{service_instance.inspect}"
-        response = {error: 'unknown action'}
+        response = {error: { klass: 'unknown action', message: kind } }
       end
       if response.respond_to? :succeed
         log "response is deferred"

@@ -56,12 +56,12 @@ module Combi
           message['payload'] ||= {}
           begin
             response = invoke_service(service_instance, kind, message['payload'])
-          rescue Exception => e
-            response = {error: {message: e.message, backtrace: e.backtrace } }
+          rescue RuntimeError => e
+            response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
           end
           {result: 'ok', response: response}
         else
-          {result: 'error', response: {error: 'unknown action'}}
+          {result: 'error', response: {error: { klass: 'unknown action', message: kind } } }
         end
       else
         {result: 'error', response: {error: 'unknown service'}}
