@@ -16,7 +16,7 @@ module Combi
           waiter.timeout(options[:timeout], 'error' => 'Timeout::Error')
           begin
             Timeout.timeout(options[:timeout]) do
-              response = service_instance.send(kind, message)
+              response = invoke_service(service_instance, kind, message)
               if response.respond_to? :succeed
                 response.callback do |service_response|
                   log "responding with deferred response: #{service_response.inspect[0..500]}"

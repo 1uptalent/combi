@@ -9,7 +9,7 @@ describe "in a multi bus environment" do
   Given(:boring_salutation_service) do
     Module.new do
       def actions; [:say_hello]; end
-      def do_it(params); "Hello #{params['who']}"; end
+      def do_it(params); "Hello #{params[:who]}"; end
     end
   end
 
@@ -26,7 +26,7 @@ describe "in a multi bus environment" do
       def do_it(params)
         defer = EventMachine::DefaultDeferrable.new
         EM.synchrony do
-          service_name = params ['service_name'] || :say_hello
+          service_name = params[:service_name] || :say_hello
           req = @other_client.request(service_name, :do_it, params, timeout: 0.1)
           service_result = EM::Synchrony.sync req
           if service_result.is_a? RuntimeError

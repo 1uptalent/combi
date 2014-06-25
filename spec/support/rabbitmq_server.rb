@@ -27,7 +27,8 @@ class RabbitmqServer
   end
 
   def start_forwarder!
-    command = "/usr/local/bin/boot2docker ssh -L #{port}:localhost:#{port} -N"
+    # workaround https://github.com/boot2docker/boot2docker-cli/issues/165
+    command = "ssh docker@localhost -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p 2022 -i ~/.ssh/id_boot2docker -N -L #{port}:localhost:#{port}"
     return if @_command_running ||= `ps`.include?(command)
     @forwarder_pid = Process.spawn command
     #Process.detach @forwarder_pid

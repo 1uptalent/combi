@@ -28,7 +28,7 @@ module Service
     end
 
     def say_hello(params)
-      "hello #{params['name']}"
+      "hello #{params[:name]}"
     end
 
   end

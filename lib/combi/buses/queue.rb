@@ -67,7 +67,7 @@ module Combi
       if service_instance.respond_to?(kind)
         log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
         begin
-          response = service_instance.send(kind, payload)
+          response = invoke_service(service_instance, kind, payload)
         rescue Exception => e
           response = {error: { message: e.message, backtrace: e.backtrace } }
         end

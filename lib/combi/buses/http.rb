@@ -55,7 +55,7 @@ module Combi
         if service_instance.respond_to? kind
           message['payload'] ||= {}
           begin
-            response = service_instance.send(kind, message['payload'])
+            response = invoke_service(service_instance, kind, message['payload'])
           rescue Exception => e
             response = {error: {message: e.message, backtrace: e.backtrace } }
           end

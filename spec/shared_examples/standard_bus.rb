@@ -6,7 +6,7 @@ shared_examples_for "standard_bus" do
     Module.new do
       def actions; [:sleep]; end
       def do_it(params)
-        sleep params['time']
+        sleep params[:time]
       end
     end
   end
@@ -15,7 +15,7 @@ shared_examples_for "standard_bus" do
     Module.new do
       def actions; [:say_hello]; end
       def do_it(params)
-        "Hello #{params['who']}"
+        "Hello #{params[:who]}"
       end
     end
   end
@@ -24,7 +24,7 @@ shared_examples_for "standard_bus" do
     Module.new do
       def actions; [:echo_this]; end
       def do_it(params)
-        params['data']
+        params[:data]
       end
     end
   end
@@ -33,7 +33,7 @@ shared_examples_for "standard_bus" do
     Module.new do
       def actions; [:shout_error]; end
       def do_it(params)
-        raise params['message']
+        raise params[:message]
       end
     end
   end

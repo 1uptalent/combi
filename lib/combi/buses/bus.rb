@@ -78,5 +78,11 @@ module Combi
       service = service_class.new
     end
 
+    def invoke_service(service_instance, action, params)
+      # convert keys to symbols in-place
+      params.keys.each {|key| params[key.to_sym] = params.delete(key) }
+      service_instance.send(action, params)
+    end
+
   end
 end

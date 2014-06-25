@@ -171,7 +171,7 @@ module Combi
       payload = message['payload'] || {}
       payload['session'] = session
       begin
-        response = invoke_service(service_name, kind, payload)
+        response = lookup_and_invoke_service(service_name, kind, payload)
       rescue Exception => e
         response = {error: {message: e.message, backtrace: e.backtrace } }
       end
@@ -198,12 +198,12 @@ module Combi
       end
     end
 
-    def invoke_service(service_name, kind, payload)
+    def lookup_and_invoke_service(service_name, kind, payload)
       handler = handlers[service_name.to_s]
       if handler
         service_instance = handler[:service_instance]
         if service_instance.respond_to? kind
-          response = service_instance.send(kind, payload)
+          response = invoke_service(service_instance, kind, payload)
         else
           log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
           response = {error: 'unknown action'}
