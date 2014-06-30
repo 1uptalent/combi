@@ -6,10 +6,10 @@ module Combi
       @waiters = {}
     end
 
-    def add_waiter(key, waiter)
-      @waiters[key] = waiter
-      waiter.callback { |r| finish key }
-      waiter.errback  { |r| finish key }
+    def add_waiter(correlation_id, waiter)
+      @waiters[correlation_id] = waiter
+      waiter.callback { |r| finish correlation_id }
+      waiter.errback  { |r| finish correlation_id }
     end
 
     def handle_rpc_response(response)
@@ -24,8 +24,8 @@ module Combi
       end
     end
 
-    def finish(key)
-      @waiters.delete key
+    def finish(correlation_id)
+      @waiters.delete correlation_id
     end
   end
 
@@ -36,17 +36,17 @@ module Combi
       puts "#{Time.now.to_f} #{self.name} #{message}"
     end
 
-    def self.wait_for(key, response_store, timeout)
+    def self.wait_for(correlation_id, response_store, timeout)
       t1 = Time.now
-      log "started waiting for #{key}"
-      waiter = new(key, response_store, timeout)
-      response_store.add_waiter(key, waiter)
-      waiter.callback {|r| log "success waiting for #{key}: #{Time.now.to_f - t1.to_f}s" }
-      waiter.errback {|r| log "failed waiting for #{key}: #{Time.now.to_f - t1.to_f}s, #{r.inspect[0..500]}" }
+      log "started waiting for #{correlation_id}"
+      waiter = new(correlation_id, response_store, timeout)
+      response_store.add_waiter(correlation_id, waiter)
+      waiter.callback {|r| log "success waiting for #{correlation_id}: #{Time.now.to_f - t1.to_f}s" }
+      waiter.errback {|r| log "failed waiting for #{correlation_id}: #{Time.now.to_f - t1.to_f}s, #{r.inspect[0..500]}" }
       waiter
     end
 
-    def initialize(key, response_store, timeout)
+    def initialize(correlation_id, response_store, timeout)
       self.timeout(timeout, 'error' => 'Timeout::Error')
     end
 
