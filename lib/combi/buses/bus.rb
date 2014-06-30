@@ -101,7 +101,7 @@ module Combi
     end
 
     def add_route_for(service_name, action_name, service_instance, options = {})
-      path = [service_name, action_name, options.inspect].join('/')
+      path = [service_name, action_name].join('/')
       puts "New route: #{path} :: #{service_instance}"
       @routes[path] = {service_instance: service_instance, options: options}
     end
@@ -113,8 +113,8 @@ module Combi
     class UnknownStop < RuntimeError
     end
 
-    def resolve_route(service_name, kind, options = {})
-      path = [service_name, kind, options.inspect].join('/')
+    def resolve_route(service_name, kind)
+      path = [service_name, kind].join('/')
       handler = @routes[path]
       if handler
         return service_instance = handler[:service_instance]

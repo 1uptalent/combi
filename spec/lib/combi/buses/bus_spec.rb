@@ -14,7 +14,7 @@ describe 'Combi::Bus' do
         end
       end
       Given(:service_definition) { service_class.new }
-      Given(:path) { 'class/remote/{}' }
+      Given(:path) { 'class/remote' }
       When { bus.add_service service_definition }
       Then { bus.routes.keys.length == 1 }
       And  { bus.routes[path][:service_instance] == service_definition }
@@ -27,7 +27,7 @@ describe 'Combi::Bus' do
           def remote; end
         end
       end
-      Given(:path) { 'module/remote/{}' }
+      Given(:path) { 'module/remote' }
       When { bus.add_service service_definition
         puts bus.routes.inspect
         puts bus.routes[path].inspect

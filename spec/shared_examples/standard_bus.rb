@@ -167,7 +167,7 @@ shared_examples_for "standard_bus" do
               service_result['error'].should eq "Timeout::Error"
             else
               service_result['error']['klass'].should eq error_message
-              service_result['error']['message'].should eq 'some_not_service/do_it/{}'
+              service_result['error']['message'].should eq 'some_not_service/do_it'
             end
             done
             finalize
@@ -187,7 +187,7 @@ shared_examples_for "standard_bus" do
           begin
             service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
             service_result['error']['klass'].should eq error_message
-            service_result['error']['message'].should eq 'echo_this/do_other/{}'
+            service_result['error']['message'].should eq 'echo_this/do_other'
             done
             finalize
           end
