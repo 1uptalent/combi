@@ -106,6 +106,10 @@ module Combi
       @routes[path] = {service_instance: service_instance, options: options}
     end
 
+    # Funny name of a exception used to signal that the requested
+    # combination of service and method can not be found.
+    #
+    # Looked much funnier the first time... (@amuino)
     class UnknownStop < RuntimeError
     end
 
