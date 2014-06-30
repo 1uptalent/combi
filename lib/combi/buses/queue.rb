@@ -69,11 +69,7 @@ module Combi
       kind = message['kind']
       payload = message['payload']
       options = message['options']
-      begin
-        response = invoke_service(service_name, kind, payload)
-      rescue RuntimeError => e
-        response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
-      end
+      response = invoke_service(service_name, kind, payload)
       if response.respond_to? :succeed
         log "response is deferred"
         response.callback do |service_response|

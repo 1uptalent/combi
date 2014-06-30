@@ -50,11 +50,7 @@ module Combi
       service_name = message['service']
       kind = message['kind']
       message['payload'] ||= {}
-      begin
-        invoke_service(service_name, kind, message['payload'])
-      rescue StandardError => e
-        {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
-      end
+      invoke_service(service_name, kind, message['payload'])
     end
 
     def request(name, kind, message, options = {})

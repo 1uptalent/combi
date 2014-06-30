@@ -129,8 +129,8 @@ module Combi
       service_instance = resolve_route(service_name.to_s, action)
       # convert keys to symbols in-place
       params.keys.each {|key| params[key.to_sym] = params.delete(key) }
-      response = service_instance.send(action, params)
-    rescue => e
+      service_instance.send(action, params)
+    rescue StandardError => e
       # TODO: report in a more effective way (I will not read server logs to find this)
       require 'yaml'
       puts " *** ERROR INVOKING SERVICE ***"
@@ -138,7 +138,8 @@ module Combi
       puts "   - #{service_name} #{service_instance.class.ancestors.join ' > '}"
       puts "   - #{action}"
       puts "   - #{params.to_yaml}"
-      raise e
+      # FIXME: strings because is what in_process tests expects
+      return {'error' => { 'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace } }
     end
 
   end

@@ -26,8 +26,6 @@ module Combi
         end
       rescue Timeout::Error => e
         waiter.fail 'error' => 'Timeout::Error'
-      rescue StandardError => e
-        waiter.fail 'error' => {'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace}
       end
       waiter
     end
