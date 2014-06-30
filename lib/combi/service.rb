@@ -50,7 +50,7 @@ module Combi
     end
 
     def to_s
-      @_TO_S ||= "#{self.class.name}#{remote_methods.inspect}"
+      @_TO_S ||= "#{self.class.name}"
     end
 
   end

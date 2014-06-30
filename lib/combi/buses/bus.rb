@@ -88,7 +88,7 @@ module Combi
           @_REMOTE_METHODS ||= service_module.public_instance_methods(false) - [:actions]
         end
         def to_s
-          @_TO_S ||= "#{service_module.name || 'Annonymous'}#{remote_methods.inspect}"
+          @_TO_S ||= "#{service_module.name || 'Annonymous'}"
         end
       end
       service_class.new
