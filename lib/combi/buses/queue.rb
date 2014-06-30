@@ -56,7 +56,7 @@ module Combi
       options[:routing_key] = name.to_s
       correlation_id = Combi::Correlation.generate
       options[:correlation_id] = correlation_id
-      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      waiter = @response_store.wait_for(correlation_id, options[:timeout])
       queue_service.next_ready_only do
         log "Making request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect[0..500]}"
         queue_service.call(kind, message, options)

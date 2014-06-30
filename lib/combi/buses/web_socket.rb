@@ -199,14 +199,14 @@ module Combi
 
     def request(name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
+      correlation_id = Combi::Correlation.generate
       msg = {
         service: name,
         kind: kind,
-        payload: message
+        payload: message,
+        correlation_id: correlation_id
       }
-      correlation_id = Combi::Correlation.generate
-      msg[:correlation_id] = correlation_id
-      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      waiter = @response_store.wait_for(correlation_id, options[:timeout])
       @ready.callback do |r|
         web_socket = @machine.ws || options[:ws]
         log "sending request #{msg.inspect}"

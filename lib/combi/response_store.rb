@@ -6,10 +6,10 @@ module Combi
       @waiters = {}
     end
 
-    def add_waiter(correlation_id, waiter)
-      @waiters[correlation_id] = waiter
-      waiter.callback { |r| finish correlation_id }
-      waiter.errback  { |r| finish correlation_id }
+    # Returns an EM::Deferrable
+    def wait_for(correlation_id, timeout)
+      waiter = EventedWaiter.new(correlation_id, timeout)
+      add_waiter correlation_id, waiter
     end
 
     def handle_rpc_response(response)
@@ -18,26 +18,30 @@ module Combi
       return unless waiter
       response = JSON.parse response['response']
       if response.respond_to?(:keys) and response['error']
-        waiter.fail(response)
+        waiter.fail response
       else
-        waiter.succeed(response)
+        waiter.succeed response
       end
     end
 
-    def finish(correlation_id)
+    protected
+
+    def add_waiter(correlation_id, waiter)
+      @waiters[correlation_id] = waiter
+      waiter.callback { |r| remove_waiter correlation_id }
+      waiter.errback  { |r| remove_waiter correlation_id }
+      waiter
+    end
+
+    def remove_waiter(correlation_id)
       @waiters.delete correlation_id
     end
   end
 
+  protected
+
   class EventedWaiter
     include EM::Deferrable
-
-    def self.wait_for(correlation_id, response_store, timeout)
-      t1 = Time.now
-      waiter = new(correlation_id, timeout)
-      response_store.add_waiter(correlation_id, waiter)
-      waiter
-    end
 
     def initialize(correlation_id, timeout)
       log "started waiting for #{correlation_id}"
@@ -47,12 +51,12 @@ module Combi
     end
 
     def succeed(*args)
-      log "success waiting for #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s"
+      log "OK > #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s"
       super
     end
 
     def fail(*args)
-      log "failed waiting for #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s, #{args.inspect[0..500]}"
+      log "KO > #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s, #{args.inspect[0..500]}"
       super
     end
 

@@ -61,7 +61,7 @@ module Combi
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
 
       correlation_id = Combi::Correlation.generate
-      waiter = EventedWaiter.wait_for(correlation_id, @response_store, options[:timeout])
+      waiter = @response_store.wait_for(correlation_id, options[:timeout])
       url = "#{@options[:remote_api]}#{name}/#{kind}"
       request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message.to_json)
       request_async.callback do |r|
