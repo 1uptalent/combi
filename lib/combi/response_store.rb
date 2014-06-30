@@ -44,25 +44,9 @@ module Combi
     include EM::Deferrable
 
     def initialize(correlation_id, timeout)
-      log "started waiting for #{correlation_id}"
       @started_wait_at = Time.now
       @correlation_id = correlation_id
       self.timeout(timeout, 'error' => 'Timeout::Error')
-    end
-
-    def succeed(*args)
-      log "OK > #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s"
-      super
-    end
-
-    def fail(*args)
-      log "KO > #{@correlation_id}: #{Time.now.to_f - @started_wait_at.to_f}s, #{args.inspect[0..500]}"
-      super
-    end
-
-    def log(message)
-      return unless @debug_mode ||= ENV['DEBUG'] == 'true'
-      puts "#{Time.now.to_f} #{self.class.name} #{message}"
     end
   end
 end

@@ -126,10 +126,15 @@ module Combi
     end
 
     def invoke_service(service_name, action, params)
+      t0 = Time.now
+      path = "#{service_name}/#{action}?#{params.inspect}"
       service_instance = resolve_route(service_name.to_s, action)
       # convert keys to symbols in-place
       params.keys.each {|key| params[key.to_sym] = params.delete(key) }
-      sync_to_async service_instance.send(action, params)
+      deferrable = sync_to_async service_instance.send(action, params)
+      deferrable.callback &log_service_invocation(true, t0, path)
+      deferrable.errback &log_service_invocation(false, t0, path)
+      deferrable
     rescue StandardError => e
       # TODO: report in a more effective way (I will not read server logs to find this)
       require 'yaml'
@@ -151,6 +156,14 @@ module Combi
         deferrable.succeed response
       end
       return deferrable
+    end
+
+    def log_service_invocation(success, t0, path)
+      Proc.new do |response|
+        base_msg = "#{success ? 'OK' : 'KO'} %10.6fs #{path}" % (Time.now - t0)
+        base_msg += response.inspect[0..500] if success == false
+        puts base_msg
+      end
     end
 
   end
