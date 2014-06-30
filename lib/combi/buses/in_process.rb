@@ -10,18 +10,12 @@ module Combi
         Timeout.timeout(options[:timeout]) do
           message = JSON.parse(message.to_json)
           response = invoke_service(service_name, kind, message)
-          if response.respond_to? :succeed
-            response.callback do |service_response|
-              log "responding with deferred response: #{service_response.inspect[0..500]}"
-              waiter.succeed service_response
-            end
-            response.errback do |service_response|
-              failure_response = { 'error' => service_response }
-              log "responding with deferred failure: #{service_response.inspect[0..500]}"
-              waiter.fail(failure_response)
-            end
-          else
-            waiter.succeed response
+          response.callback do |service_response|
+            waiter.succeed service_response
+          end
+          response.errback do |service_response|
+            failure_response = { 'error' => service_response }
+            waiter.fail(failure_response)
           end
         end
       rescue Timeout::Error => e

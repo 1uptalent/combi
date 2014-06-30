@@ -177,22 +177,13 @@ module Combi
 
       msg = {result: 'ok', correlation_id: message['correlation_id']}
 
-      if response.respond_to? :succeed
-        log "response is deferred"
-        response.callback do |service_response|
-          log "responding with deferred answer: #{service_response.inspect[0..500]}"
-          msg[:response] = service_response.to_json
-          ws.send(msg.to_json)
-        end
-        response.errback do |service_response|
-          log "responding with deferred error: #{service_response.inspect[0..500]}"
-          error_response = { error: service_response }
-          msg[:response] = error_response.to_json
-          ws.send(msg.to_json)
-        end
-      else
-        log "responding with inmediate answer: #{response.inspect[0..500]}"
-        msg[:response] = response.to_json
+      response.callback do |service_response|
+        msg[:response] = service_response.to_json
+        ws.send(msg.to_json)
+      end
+      response.errback do |service_response|
+        error_response = { error: service_response }
+        msg[:response] = error_response.to_json
         ws.send(msg.to_json)
       end
     end

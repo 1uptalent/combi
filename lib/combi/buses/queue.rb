@@ -70,20 +70,12 @@ module Combi
       payload = message['payload']
       options = message['options']
       response = invoke_service(service_name, kind, payload)
-      if response.respond_to? :succeed
-        log "response is deferred"
-        response.callback do |service_response|
-          log "responding with deferred answer: #{service_response.inspect[0..500]}"
-          queue_service.respond(service_response.to_json, delivery_info)
-        end
-        response.errback do |service_response|
-          failure_response = { error: service_response }
-          log "responding with deferred failure: #{service_response.inspect[0..500]}"
-          queue_service.respond(failure_response.to_json, delivery_info)
-        end
-      else
-        log "responding with inmediate answer: #{response.inspect[0..500]}"
-        queue_service.respond(response.to_json, delivery_info)
+      response.callback do |service_response|
+        queue_service.respond(service_response.to_json, delivery_info)
+      end
+      response.errback do |service_response|
+        failure_response = { error: service_response }
+        queue_service.respond(failure_response.to_json, delivery_info)
       end
     end
 

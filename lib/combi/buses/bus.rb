@@ -129,7 +129,7 @@ module Combi
       service_instance = resolve_route(service_name.to_s, action)
       # convert keys to symbols in-place
       params.keys.each {|key| params[key.to_sym] = params.delete(key) }
-      service_instance.send(action, params)
+      sync_to_async service_instance.send(action, params)
     rescue StandardError => e
       # TODO: report in a more effective way (I will not read server logs to find this)
       require 'yaml'
@@ -139,7 +139,18 @@ module Combi
       puts "   - #{action}"
       puts "   - #{params.to_yaml}"
       # FIXME: strings because is what in_process tests expects
-      return {'error' => { 'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace } }
+      return sync_to_async 'error' => { 'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace }
+    end
+
+    def sync_to_async(response)
+      return response if response.respond_to? :succeed # already a deferrable
+      deferrable = EM::DefaultDeferrable.new
+      if response.respond_to?(:keys) and response['error']
+        deferrable.fail response['error']
+      else
+        deferrable.succeed response
+      end
+      return deferrable
     end
 
   end
