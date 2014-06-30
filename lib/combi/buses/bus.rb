@@ -5,13 +5,12 @@ require 'yajl/json_gem' # for object.to_json, JSON.parse, etc...
 
 module Combi
   class Bus
-    attr_reader :services
-
     RPC_DEFAULT_TIMEOUT = 1
+    attr_reader :routes
 
     def initialize(options)
       @options = options
-      @services = []
+      @routes = {}
       post_initialize
     end
 
@@ -19,9 +18,14 @@ module Combi
     end
 
     def add_service(service_definition, options = {})
-      service = make_service_instance(service_definition)
-      service.setup(self, options[:context])
-      @services << service
+      service_instance = make_service_instance(service_definition)
+      service_instance.actions.each do |service_name|
+        self.add_routes_for(service_name, service_instance)
+      end
+      service_instance.fast_actions.each do |service_name|
+        self.add_routes_for(service_name, service_instance, fast: true)
+      end
+      service_instance.setup(self, options[:context])
     end
 
     def start!
@@ -74,20 +78,60 @@ module Combi
       service_class = Class.new do
         include Combi::Service
         include a_module
+
+        define_method :service_module do
+           a_module
+        end
+        protected :service_module
+
+        def remote_methods
+          @_REMOTE_METHODS ||= service_module.public_instance_methods(false) - [:actions]
+        end
+        def to_s
+          @_TO_S ||= "#{service_module.name || 'Annonymous'}#{remote_methods.inspect}"
+        end
       end
-      service = service_class.new
+      service_class.new
     end
 
-    def invoke_service(service_instance, action, params)
+    def add_routes_for(service_name, service_instance, options = {})
+      service_instance.remote_methods.each do |method|
+        add_route_for(service_name, method, service_instance, options)
+      end
+    end
+
+    def add_route_for(service_name, action_name, service_instance, options = {})
+      path = [service_name, action_name, options.inspect].join('/')
+      puts "New route: #{path} :: #{service_instance}"
+      @routes[path] = {service_instance: service_instance, options: options}
+    end
+
+    class UnknownStop < RuntimeError
+    end
+
+    def resolve_route(service_name, kind, options = {})
+      path = [service_name, kind, options.inspect].join('/')
+      handler = @routes[path]
+      if handler
+        return service_instance = handler[:service_instance]
+      else
+        log "[WARNING] Service Path #{path} not found"
+        log "[WARNING] routes: #{@routes.keys.inspect}"
+        raise UnknownStop.new(path)
+      end
+    end
+
+    def invoke_service(service_name, action, params)
+      service_instance = resolve_route(service_name.to_s, action)
       # convert keys to symbols in-place
       params.keys.each {|key| params[key.to_sym] = params.delete(key) }
-      service_instance.send(action, params)
+      response = service_instance.send(action, params)
     rescue => e
       # TODO: report in a more effective way (I will not read server logs to find this)
       require 'yaml'
       puts " *** ERROR INVOKING SERVICE ***"
       puts "   - #{e.inspect}"
-      puts "   - #{service_instance.class.ancestors.join ' > '}"
+      puts "   - #{service_name} #{service_instance.class.ancestors.join ' > '}"
       puts "   - #{action}"
       puts "   - #{params.to_yaml}"
       raise e

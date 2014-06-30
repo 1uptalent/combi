@@ -6,7 +6,6 @@ module Combi
       context[:service_bus] = service_bus
       setup_context(context)
       setup_services
-      register_actions
     end
 
     def setup_context(context)
@@ -19,15 +18,6 @@ module Combi
     end
 
     def setup_services
-    end
-
-    def register_actions
-      actions.each do |handler|
-        service_bus.respond_to(self, handler)
-      end
-      fast_actions.each do |handler|
-        service_bus.respond_to(self, handler, fast: true)
-      end
     end
 
     def no_response
@@ -46,6 +36,10 @@ module Combi
       []
     end
 
+    def remote_methods
+      @_REMOTE_METHODS ||= public_methods(false) - Combi::Service.public_instance_methods
+    end
+
     def service_bus
       @service_bus
     end
@@ -53,6 +47,10 @@ module Combi
     def enable(*services, &block)
       service_bus.enable(services)
       yield block if block_given?
+    end
+
+    def to_s
+      @_TO_S ||= "#{self.class.name}#{remote_methods.inspect}"
     end
 
   end

@@ -48,32 +48,13 @@ module Combi
 
     def on_message(message)
       service_name = message['service']
-      handler = handlers[service_name.to_s]
-      if handler
-        service_instance = handler[:service_instance]
-        kind = message['kind']
-        if service_instance.respond_to? kind
-          message['payload'] ||= {}
-          begin
-            response = invoke_service(service_instance, kind, message['payload'])
-          rescue RuntimeError => e
-            response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
-          end
-          {result: 'ok', response: response}
-        else
-          {result: 'error', response: {error: { klass: 'unknown action', message: kind } } }
-        end
-      else
-        {result: 'error', response: {error: 'unknown service'}}
+      kind = message['kind']
+      message['payload'] ||= {}
+      begin
+        invoke_service(service_name, kind, message['payload'])
+      rescue StandardError => e
+        {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
-    end
-
-    def respond_to(service_instance, action, options = {})
-      handlers[action.to_s] = {service_instance: service_instance, options: options}
-    end
-
-    def handlers
-      @handlers ||= {}
     end
 
     def request(name, kind, message, options = {})
@@ -85,7 +66,7 @@ module Combi
       request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message.to_json)
       request_async.callback do |r|
         parsed = JSON.parse(r.response)
-        waiter.succeed(parsed['response'])
+        waiter.succeed(parsed)
       end
       request_async.errback do |x|
         waiter.fail(Timeout::Error.new)

@@ -25,8 +25,13 @@ module Combi
       end
     end
 
-    def respond_to(service_instance, action, options = {})
-      log "registering #{action}"
+    def add_routes_for(service_name, service_instance, options = {})
+      create_queue_for_service(service_name, options)
+      super
+    end
+
+    def create_queue_for_service(service_name, options = {})
+      log "creating queue #{service_name}"
       queue_options = {}
       subscription_options = {}
       if options[:fast] == true
@@ -35,10 +40,10 @@ module Combi
         subscription_options[:ack] = true
       end
       queue_service.ready do
-        queue_service.queue(action.to_s, queue_options) do |queue|
-          log "subscribing to queue #{action.to_s} with options #{queue_options}"
+        queue_service.queue(service_name.to_s, queue_options) do |queue|
+          log "subscribing to queue #{service_name.to_s} with options #{queue_options}"
           queue.subscribe(subscription_options) do |delivery_info, payload|
-            respond service_instance, payload, delivery_info
+            respond service_name, payload, delivery_info
             queue_service.acknowledge delivery_info unless options[:fast] == true
           end
         end
@@ -59,21 +64,15 @@ module Combi
       waiter
     end
 
-    def respond(service_instance, request, delivery_info)
+    def respond(service_name, request, delivery_info)
       message = JSON.parse request
       kind = message['kind']
       payload = message['payload']
       options = message['options']
-      if service_instance.respond_to?(kind)
-        log "generating response for #{service_instance.class}#{service_instance.actions.inspect}.#{kind} #{payload.inspect[0..500]}"
-        begin
-          response = invoke_service(service_instance, kind, payload)
-        rescue RuntimeError => e
-          response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
-        end
-      else
-        log "Service instance does not respond to #{kind}: #{service_instance.inspect}"
-        response = {error: { klass: 'unknown action', message: kind } }
+      begin
+        response = invoke_service(service_name, kind, payload)
+      rescue RuntimeError => e
+        response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
       if response.respond_to? :succeed
         log "response is deferred"

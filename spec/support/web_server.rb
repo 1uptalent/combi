@@ -9,14 +9,14 @@ class DeferrableBody
     @defer = defer
     @defer.callback do |service_response|
       EM::next_tick do
-        self.call [{result: 'ok', response: service_response}.to_json]
+        self.call [service_response.to_json]
         self.succeed
       end
     end
     @defer.errback do |service_response|
       error_response = { error: service_response }
       EM::next_tick do
-        self.call [{result: 'ok', response: error_response}.to_json]
+        self.call [error_response.to_json]
         self.fail
       end
     end
@@ -38,8 +38,8 @@ def start_web_server(http_bus, port, webserver = 'thin')
   require webserver
   app = lambda do |env|
     response_message = http_bus.manage_request(env)
-    if response_message[:response].respond_to? :succeed
-      env['async.callback'].call [200, {}, DeferrableBody.new(response_message[:response])]
+    if response_message.respond_to? :succeed
+      env['async.callback'].call [200, {}, DeferrableBody.new(response_message)]
       AsyncResponse
     else
       response_rack = Rack::Response.new

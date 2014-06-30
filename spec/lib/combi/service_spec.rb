@@ -9,18 +9,14 @@ describe 'Combi::Service' do
     Given!("setup methods are stubbed") do
       subject.stub(:setup_context).and_call_original
       subject.stub(:setup_services).and_call_original
-      subject.stub(:register_actions).and_call_original
     end
     Given(:the_bus) { double "the bus" }
     When { subject.setup the_bus, context }
     context 'sets up the context' do
-      Then { subject.should have_received :setup_context }
+      Then { subject.should have_received(:setup_context).with context }
     end
     context 'allows the service to setup itself' do
       Then { subject.should have_received :setup_services }
-    end
-    context 'registers the advertised actions' do
-      Then { subject.should have_received :register_actions }
     end
     context 'always includes the service_bus in the context' do
       Then { subject.service_bus == the_bus }

@@ -96,11 +96,10 @@ module Combi
 
     end
 
-    attr_reader :handlers, :ready
+    attr_reader :ready
 
     def initialize(options)
       super
-      @handlers = {}
     end
 
     def post_initialize
@@ -171,7 +170,7 @@ module Combi
       payload = message['payload'] || {}
       payload['session'] = session
       begin
-        response = lookup_and_invoke_service(service_name, kind, payload)
+        response = invoke_service(service_name, kind, payload)
       rescue RuntimeError => e
         response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
@@ -196,29 +195,6 @@ module Combi
         msg[:response] = response.to_json
         ws.send(msg.to_json)
       end
-    end
-
-    def lookup_and_invoke_service(service_name, kind, payload)
-      handler = handlers[service_name.to_s]
-      if handler
-        service_instance = handler[:service_instance]
-        if service_instance.respond_to? kind
-          response = invoke_service(service_instance, kind, payload)
-        else
-          log "[WARNING] Service #{service_name}(#{service_instance.class.name}) does not respond to message #{kind}"
-          response = {error: { klass: 'unknown action', message: kind } }
-        end
-      else
-        log "[WARNING] Service #{service_name} not found"
-        log "[WARNING] handlers: #{handlers.keys.inspect}"
-        response = {error: 'unknown service'}
-      end
-    end
-
-    def respond_to(service_instance, action, options = {})
-      log "registering #{action}"
-      handlers[action.to_s] = {service_instance: service_instance, options: options}
-      log "handlers: #{handlers.keys.inspect}"
     end
 
     def request(name, kind, message, options = {})

@@ -1,22 +1,40 @@
 require 'spec_helper'
+require 'combi/buses/bus'
 
 describe 'Combi::Bus' do
   context 'registers services' do
-    Given(:subject) { Combi::Bus.new({}) }
+    Given(:bus) { Combi::Bus.new({}) }
 
     context 'via instances' do
-      Given(:service_class) { Class.new{include Combi::Service} }
+      Given(:service_class) do
+        Class.new do
+          include Combi::Service
+          def actions; ['class']; end
+          def remote; end
+        end
+      end
       Given(:service_definition) { service_class.new }
-      When { subject.add_service service_definition }
-      Then { subject.services == [service_definition] }
+      Given(:path) { 'class/remote/{}' }
+      When { bus.add_service service_definition }
+      Then { bus.routes.keys.length == 1 }
+      And  { bus.routes[path][:service_instance] == service_definition }
     end
 
     context 'via modules' do
-      Given(:service_definition) { Module.new }
-      When { subject.add_service service_definition }
-      Then { subject.services.length == 1 }
-       And { Combi::Service === subject.services[0] }
-       And { service_definition === subject.services[0] }
+      Given(:service_definition) do
+        Module.new do
+          def actions; ['module']; end
+          def remote; end
+        end
+      end
+      Given(:path) { 'module/remote/{}' }
+      When { bus.add_service service_definition
+        puts bus.routes.inspect
+        puts bus.routes[path].inspect
+        puts bus.routes.keys.inspect
+      }
+      Then { bus.routes.keys.length == 1 }
+      And  { bus.routes[path][:service_instance].is_a? service_definition }
     end
   end
 end

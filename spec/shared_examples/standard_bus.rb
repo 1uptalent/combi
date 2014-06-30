@@ -155,7 +155,7 @@ shared_examples_for "standard_bus" do
   end
 
   context 'return an error when requesting an unknown service' do
-    Given(:error_message) { 'unknown service' }
+    Given(:error_message) { Combi::Bus::UnknownStop.name }
     When(:service) { provider.add_service broken_service }
     Then do
       em do
@@ -163,10 +163,11 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           begin
             service_result = EM::Synchrony.sync consumer.request(:some_not_service, :do_it, {}, { timeout: 0.1 })
-            if consumer.class == Combi::Queue
+            if defined?(Combi::Queue) and consumer.class == Combi::Queue
               service_result['error'].should eq "Timeout::Error"
             else
-              service_result['error'].should eq error_message
+              service_result['error']['klass'].should eq error_message
+              service_result['error']['message'].should eq 'some_not_service/do_it/{}'
             end
             done
             finalize
@@ -177,7 +178,7 @@ shared_examples_for "standard_bus" do
   end
 
   context 'return an error when requesting an unknown action for the service' do
-    Given(:error_message) { 'unknown action' }
+    Given(:error_message) { Combi::Bus::UnknownStop.name }
     When(:service) { provider.add_service echo_service }
     Then do
       em do
@@ -186,7 +187,7 @@ shared_examples_for "standard_bus" do
           begin
             service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
             service_result['error']['klass'].should eq error_message
-            service_result['error']['message'].should eq 'do_other'
+            service_result['error']['message'].should eq 'echo_this/do_other/{}'
             done
             finalize
           end
