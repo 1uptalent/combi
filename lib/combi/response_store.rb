@@ -8,8 +8,9 @@ module Combi
 
     # Returns an EM::Deferrable
     def wait_for(correlation_id, timeout)
-      waiter = EventedWaiter.new(correlation_id, timeout)
+      waiter = EM::DefaultDeferrable.new
       add_waiter correlation_id, waiter
+      waiter.timeout(timeout, 'error' => 'Timeout::Error')
     end
 
     def handle_rpc_response(response)
@@ -35,18 +36,6 @@ module Combi
 
     def remove_waiter(correlation_id)
       @waiters.delete correlation_id
-    end
-  end
-
-  protected
-
-  class EventedWaiter
-    include EM::Deferrable
-
-    def initialize(correlation_id, timeout)
-      @started_wait_at = Time.now
-      @correlation_id = correlation_id
-      self.timeout(timeout, 'error' => 'Timeout::Error')
     end
   end
 end
