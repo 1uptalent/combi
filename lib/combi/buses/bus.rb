@@ -159,8 +159,10 @@ module Combi
 
     def log_service_invocation(success, t0, path)
       Proc.new do |response|
-        base_msg = "#{success ? 'OK' : 'KO'} %10.6fs #{path}" % (Time.now - t0)
-        base_msg += response.inspect[0..500] if success == false
+        result = success ? 'OK' : 'KO'
+        time = '%10.6fs' % (Time.now - t0)
+        base_msg = "#{result}\t#{time}\t#{path}"
+        base_msg += "\t#{response.inspect}" if success == false
         puts base_msg
       end
     end
