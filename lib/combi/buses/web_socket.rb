@@ -23,8 +23,8 @@ module Combi
       end
 
       def on_message(ws, session, raw_message)
-        @bus.log "ON MESSAGE #{raw_message[0..500]}"
-        message = JSON.parse(raw_message)
+        @bus.log "WS SERVER ON MESSAGE #{raw_message[0..500]}"
+        message = Yajl::Parser.parse raw_message, symbolize_keys: true
         @bus.on_message(ws, message, session)
       end
 
@@ -73,7 +73,7 @@ module Combi
 
         ws.on :message do |event|
           @bus.log "ON MESSAGE: #{event.data[0..500]}"
-          message = JSON.parse(event.data)
+          message = Yajl::Parser.parse event.data, symbolize_keys: true
           @bus.on_message(ws, message)
         end
 
@@ -160,31 +160,32 @@ module Combi
     end
 
     def on_message(ws, message, session = nil)
-      if message['correlation_id'] && message.has_key?('result')
+      if message[:correlation_id] && message.has_key?(:result)
         @response_store.handle_rpc_response(message)
-        log "Stored message with correlation_id #{message['correlation_id']} - #{message.inspect[0..500]}"
+        log "Handled response with correlation_id #{message[:correlation_id]} - #{message.inspect[0..500]}"
         return
       end
-      service_name = message['service']
-      kind = message['kind']
-      payload = message['payload'] || {}
-      payload['session'] = session
+      service_name = message[:service]
+      kind = message[:kind]
+      payload = message[:payload] || {}
+      payload[:session] = session
       begin
         response = invoke_service(service_name, kind, payload)
       rescue RuntimeError => e
         response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
 
-      msg = {result: 'ok', correlation_id: message['correlation_id']}
+      msg = {result: 'ok', correlation_id: message[:correlation_id]}
 
       response.callback do |service_response|
-        msg[:response] = service_response.to_json
-        ws.send(msg.to_json)
+        msg[:response] = service_response
+        serialized = Yajl::Encoder.encode msg
+        ws.send serialized
       end
       response.errback do |service_response|
-        error_response = { error: service_response }
-        msg[:response] = error_response.to_json
-        ws.send(msg.to_json)
+        msg[:response] = {error: service_response}
+        serialized = Yajl::Encoder.encode msg
+        ws.send serialized
       end
     end
 
@@ -200,8 +201,11 @@ module Combi
       waiter = @response_store.wait_for(correlation_id, options[:timeout])
       @ready.callback do |r|
         web_socket = @machine.ws || options[:ws]
-        log "sending request #{msg.inspect}"
-        web_socket.send msg.to_json unless web_socket.nil?
+        unless web_socket.nil?
+          serialized = Yajl::Encoder.encode msg
+          log "sending request #{serialized}"
+          web_socket.send serialized
+        end
       end
       waiter
     end

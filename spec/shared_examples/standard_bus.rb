@@ -69,8 +69,8 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           service_result = EM::Synchrony.sync consumer.request(:sleep, :do_it, params, { timeout: time_base/2.0 })
           service_result.should be_a Hash
-          service_result.should have_key 'error'
-          service_result['error'].should eq 'Timeout::Error'
+          service_result.should have_key :error
+          service_result[:error].should eq 'Timeout::Error'
           done(time_base) #timeout response must came before this timeout
         end
         finalize
@@ -114,8 +114,15 @@ shared_examples_for "standard_bus" do
     end
 
     context 'for maps' do
-      Given(:data) { {'a' => 1, 'b' => 'dos'} }
-      Then { result_container[:result].should eq data}
+      context 'with string keys' do
+        Given(:data) { {'a' => 1, 'b' => 'dos'} }
+        Then { result_container[:result].keys.should eq data.keys.map(&:to_sym)}
+        And  { result_container[:result].values.should eq data.values }
+      end
+      context 'with symbol keys' do
+        Given(:data) { {a: 1, b: 'dos'} }
+        Then { result_container[:result].should eq data}
+      end
     end
 
     context 'for objects returns their json version' do
@@ -131,7 +138,7 @@ shared_examples_for "standard_bus" do
         end
       end
       Given(:data) { custom_class.new(custom_json).to_json}
-      Then { result_container[:result].should eq JSON.parse(custom_json.to_json)}
+      Then { result_container[:result].should eq custom_json}
     end
   end
 
@@ -143,10 +150,10 @@ shared_examples_for "standard_bus" do
         prepare
         EM.synchrony do
           service_result = EM::Synchrony.sync consumer.request(:shout_error, :do_it, {message: error_message}, { timeout: 0.1 })
-          service_result['error'].should be_a Hash
-          service_result['error']['message'].should eq error_message
-          service_result['error']['backtrace'].should_not be_nil
-          service_result['error']['backtrace'].should be_an Array
+          service_result[:error].should be_a Hash
+          service_result[:error][:message].should eq error_message
+          service_result[:error][:backtrace].should_not be_nil
+          service_result[:error][:backtrace].should be_an Array
           done
           finalize
         end
@@ -164,10 +171,10 @@ shared_examples_for "standard_bus" do
           begin
             service_result = EM::Synchrony.sync consumer.request(:some_not_service, :do_it, {}, { timeout: 0.1 })
             if defined?(Combi::Queue) and consumer.class == Combi::Queue
-              service_result['error'].should eq "Timeout::Error"
+              service_result[:error].should eq "Timeout::Error"
             else
-              service_result['error']['klass'].should eq error_message
-              service_result['error']['message'].should eq 'some_not_service/do_it'
+              service_result[:error][:klass].should eq error_message
+              service_result[:error][:message].should eq 'some_not_service/do_it'
             end
             done
             finalize
@@ -186,8 +193,8 @@ shared_examples_for "standard_bus" do
         EM.synchrony do
           begin
             service_result = EM::Synchrony.sync consumer.request(:echo_this, :do_other, {}, { timeout: 0.1 })
-            service_result['error']['klass'].should eq error_message
-            service_result['error']['message'].should eq 'echo_this/do_other'
+            service_result[:error][:klass].should eq error_message
+            service_result[:error][:message].should eq 'echo_this/do_other'
             done
             finalize
           end

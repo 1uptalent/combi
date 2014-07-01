@@ -8,15 +8,17 @@ class DeferrableBody
   def initialize(defer)
     @defer = defer
     @defer.callback do |service_response|
+      json_response = Yajl::Encoder.encode service_response
       EM::next_tick do
-        self.call [service_response.to_json]
+        self.call [json_response]
         self.succeed
       end
     end
     @defer.errback do |service_response|
       error_response = { error: service_response }
+      json_response = Yajl::Encoder.encode error_response
       EM::next_tick do
-        self.call [error_response.to_json]
+        self.call [json_response]
         self.fail
       end
     end
@@ -38,16 +40,8 @@ def start_web_server(http_bus, port, webserver = 'thin')
   require webserver
   app = lambda do |env|
     response_message = http_bus.manage_request(env)
-    if response_message.respond_to? :succeed
-      env['async.callback'].call [200, {}, DeferrableBody.new(response_message)]
-      AsyncResponse
-    else
-      response_rack = Rack::Response.new
-      response_rack.status = response_message.nil? ? 201 : 200
-      response_rack.body = [response_message.to_json]
-      response_rack.finish
-      response_rack
-    end
+    env['async.callback'].call [200, {}, DeferrableBody.new(response_message)]
+    AsyncResponse
   end
   Thin::Logging.silent = true if webserver == 'thin'
   rack_handler = Rack::Handler.get(webserver)

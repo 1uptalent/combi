@@ -94,8 +94,8 @@ describe 'Combi::WebSocket' do
             provider.stop!
             service_result = EM::Synchrony.sync consumer.request(:null, :do_it, {}, { timeout: 0.3 })
             service_result.should be_a Hash
-            service_result.should have_key 'error'
-            service_result['error'].should eq 'Timeout::Error'
+            service_result.should have_key :error
+            service_result[:error].should eq 'Timeout::Error'
             done(0.3) #timeout response must came before this timeout
           end
           provider.stop!

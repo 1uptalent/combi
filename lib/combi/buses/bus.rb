@@ -1,7 +1,6 @@
 require "combi/service"
 require_relative 'correlation'
 require 'yajl'
-require 'yajl/json_gem' # for object.to_json, JSON.parse, etc...
 
 module Combi
   class Bus
@@ -142,16 +141,16 @@ module Combi
       puts "   - #{e.inspect}"
       puts "   - #{service_name} #{service_instance.class.ancestors.join ' > '}"
       puts "   - #{action}"
-      puts "   - #{params.to_yaml}"
+      puts "   - #{params.to_yaml.split("\n").join("\n\t")}"
       # FIXME: strings because is what in_process tests expects
-      return sync_to_async 'error' => { 'klass' => e.class.name, 'message' => e.message, 'backtrace' => e.backtrace }
+      return sync_to_async error: { klass: e.class.name, message: e.message, backtrace: e.backtrace }
     end
 
     def sync_to_async(response)
       return response if response.respond_to? :succeed # already a deferrable
       deferrable = EM::DefaultDeferrable.new
-      if response.respond_to?(:keys) and response['error']
-        deferrable.fail response['error']
+      if response.respond_to?(:keys) and response[:error]
+        deferrable.fail response[:error]
       else
         deferrable.succeed response
       end
