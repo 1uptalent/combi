@@ -33,10 +33,6 @@ module Combi
       []
     end
 
-    def fast_actions
-      []
-    end
-
     def remote_methods
       @_REMOTE_METHODS ||= public_methods(false) - Combi::Service.public_instance_methods
     end
