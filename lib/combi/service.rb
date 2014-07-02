@@ -6,6 +6,7 @@ module Combi
       context[:service_bus] = service_bus
       setup_context(context)
       setup_services
+      self
     end
 
     def setup_context(context)

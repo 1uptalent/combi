@@ -53,17 +53,21 @@ module Combi
     def request(name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
 
-      correlation_id = Combi::Correlation.generate
-      waiter = @response_store.wait_for(correlation_id, options[:timeout])
       url = "#{@options[:remote_api]}#{name}/#{kind}"
       message_json = Yajl::Encoder.encode(message)
       request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message_json)
-      request_async.callback do |r|
-        parsed = Yajl::Parser.parse(r.response, symbolize_keys: true)
-        waiter.succeed(parsed)
-      end
-      request_async.errback do |x|
-        waiter.fail(Timeout::Error.new)
+      if options[:fast]
+        waiter = nil
+      else
+        correlation_id = Combi::Correlation.generate
+        waiter = @response_store.wait_for(correlation_id, options[:timeout])
+        request_async.callback do |r|
+          parsed = Yajl::Parser.parse(r.response, symbolize_keys: true)
+          waiter.succeed(parsed)
+        end
+        request_async.errback do |x|
+          waiter.fail(Timeout::Error.new)
+        end
       end
       waiter
     end

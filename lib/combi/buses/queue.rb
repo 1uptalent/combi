@@ -54,9 +54,13 @@ module Combi
       log "Preparing request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect}"
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
       options[:routing_key] = name.to_s
-      correlation_id = Combi::Correlation.generate
-      options[:correlation_id] = correlation_id
-      waiter = @response_store.wait_for(correlation_id, options[:timeout])
+      if options[:fast]
+        waiter = nil
+      else
+        correlation_id = Combi::Correlation.generate
+        options[:correlation_id] = correlation_id
+        waiter = @response_store.wait_for(correlation_id, options[:timeout])
+      end
       queue_service.next_ready_only do
         log "Making request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect[0..500]}"
         queue_service.call(kind, message, options)

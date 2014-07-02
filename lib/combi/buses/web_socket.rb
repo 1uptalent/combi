@@ -191,14 +191,18 @@ module Combi
 
     def request(name, kind, message, options = {})
       options[:timeout] ||= RPC_DEFAULT_TIMEOUT
-      correlation_id = Combi::Correlation.generate
       msg = {
         service: name,
         kind: kind,
-        payload: message,
-        correlation_id: correlation_id
+        payload: message
       }
-      waiter = @response_store.wait_for(correlation_id, options[:timeout])
+      if options[:fast]
+        waiter = nil
+      else
+        correlation_id = Combi::Correlation.generate
+        msg[:correlation_id] = correlation_id
+        waiter = @response_store.wait_for(correlation_id, options[:timeout])
+      end
       @ready.callback do |r|
         web_socket = @machine.ws || options[:ws]
         unless web_socket.nil?
