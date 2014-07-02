@@ -114,12 +114,13 @@ module Combi
       end
     end
 
-    def call(kind, message, options = {})
-      log "sending request #{kind} #{message.inspect[0..500]} with options #{options.inspect}"
-      raise "RPC is not enabled or reply_to is not included" if (@rpc_queue.nil? || @rpc_queue.name.nil?) && options[:reply_to].nil?
+    def publish_request(kind, message, options = {})
+      if options.has_key? :correlation_id
+        # wants a response
+        options[:reply_to] = @rpc_queue.name
+      end
       options[:expiration] = ((options[:timeout] || RPC_DEFAULT_TIMEOUT) * 1000).to_i
-      options[:routing_key] ||= 'rcalls_queue'
-      options[:reply_to] ||= @rpc_queue.name
+      log "sending request #{kind} #{message.inspect[0..500]} with options #{options.inspect}"
       request = Yajl::Encoder.encode kind: kind, payload: message, options: {}
       publish request, options
     end
