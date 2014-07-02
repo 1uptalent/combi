@@ -25,26 +25,22 @@ module Combi
       end
     end
 
-    def add_routes_for(service_name, service_instance, options = {})
-      create_queue_for_service(service_name, options)
+    def add_routes_for(service_name, service_instance)
+      create_queue_for_service(service_name)
       super
     end
 
-    def create_queue_for_service(service_name, options = {})
+    def create_queue_for_service(service_name)
       log "creating queue #{service_name}"
       queue_options = {}
       subscription_options = {}
-      if options[:fast] == true
-        queue_options[:auto_delete] = false
-      else
-        subscription_options[:ack] = true
-      end
+      subscription_options[:ack] = true
       queue_service.ready do
         queue_service.queue(service_name.to_s, queue_options) do |queue|
-          log "subscribing to queue #{service_name.to_s} with options #{queue_options}"
+          log "subscribing to queue #{service_name.to_s}"
           queue.subscribe(subscription_options) do |delivery_info, payload|
             respond service_name, payload, delivery_info
-            queue_service.acknowledge delivery_info unless options[:fast] == true
+            queue_service.acknowledge delivery_info
           end
         end
       end

@@ -21,9 +21,6 @@ module Combi
       service_instance.actions.each do |service_name|
         self.add_routes_for(service_name, service_instance)
       end
-      service_instance.fast_actions.each do |service_name|
-        self.add_routes_for(service_name, service_instance, fast: true)
-      end
       service_instance.setup(self, options[:context])
     end
 
@@ -93,16 +90,16 @@ module Combi
       service_class.new
     end
 
-    def add_routes_for(service_name, service_instance, options = {})
+    def add_routes_for(service_name, service_instance)
       service_instance.remote_methods.each do |method|
-        add_route_for(service_name, method, service_instance, options)
+        add_route_for(service_name, method, service_instance)
       end
     end
 
-    def add_route_for(service_name, action_name, service_instance, options = {})
+    def add_route_for(service_name, action_name, service_instance)
       path = [service_name, action_name].join('/')
       puts "New route: #{path} :: #{service_instance}"
-      @routes[path] = {service_instance: service_instance, options: options}
+      @routes[path] = service_instance
     end
 
     # Funny name of a exception used to signal that the requested
@@ -114,14 +111,10 @@ module Combi
 
     def resolve_route(service_name, kind)
       path = [service_name, kind].join('/')
-      handler = @routes[path]
-      if handler
-        return service_instance = handler[:service_instance]
-      else
-        log "[WARNING] Service Path #{path} not found"
-        log "[WARNING] routes: #{@routes.keys.inspect}"
-        raise UnknownStop.new(path)
-      end
+      return @routes[path] if @routes[path]
+      log "[WARNING] Service Path #{path} not found"
+      log "[WARNING] routes: #{@routes.keys.inspect}"
+      raise UnknownStop.new(path)
     end
 
     def invoke_service(service_name, action, params)
