@@ -32,10 +32,6 @@ module Combi
         session && session.close
       end
 
-      def ws
-        @ws
-      end
-
     end
 
     class Client
@@ -52,7 +48,7 @@ module Combi
       end
 
       def stop!
-        @ws && @ws.close
+        ws && ws.close
         @bus.log "stop requested"
       end
 
@@ -90,7 +86,6 @@ module Combi
       end
 
       def ws
-        @bus.log "ws present: #{@ws != nil}"
         @ws
       end
 
@@ -195,7 +190,7 @@ module Combi
       ws.send serialized
     end
 
-    def request(name, kind, message, timeout: RPC_DEFAULT_TIMEOUT, fast: false)
+    def request(name, kind, message, timeout: RPC_DEFAULT_TIMEOUT, fast: false, ws: nil)
       msg = {
         service: name,
         kind: kind,
@@ -209,7 +204,7 @@ module Combi
         waiter = @response_store.wait_for(correlation_id, timeout)
       end
       @ready.callback do |r|
-        web_socket = @machine.ws
+        web_socket = @machine.respond_to?(:ws) ? @machine.ws : ws
         unless web_socket.nil?
           serialized = Yajl::Encoder.encode msg
           log "sending request #{serialized}"
