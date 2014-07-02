@@ -49,6 +49,24 @@ describe 'Combi::Queue' do
     end
   end
 
+  context 'fire and forget' do
+    describe 'does not send a response' do
+      When(:service) { provider.add_service null_service }
+      Then do
+        em do
+          expect(provider.queue_service).not_to receive(:respond)
+          expect(service).to receive(:do_it) do
+            done
+            provider.stop!
+            consumer.stop!
+          end
+          prepare
+          consumer.request :null, :do_it, {}, fast: true
+        end
+      end
+    end
+  end
+
   context "it resist a reconnection" do
     puts "VERY UNSTABLE TEST"
     When(:service) { provider.add_service null_service }

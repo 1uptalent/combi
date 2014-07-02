@@ -39,7 +39,7 @@ module Combi
         queue_service.queue(service_name.to_s, queue_options) do |queue|
           log "subscribing to queue #{service_name.to_s}"
           queue.subscribe(subscription_options) do |delivery_info, payload|
-            respond service_name, payload, delivery_info
+            process_queue_message service_name, payload, delivery_info
             queue_service.acknowledge delivery_info
           end
         end
@@ -66,18 +66,20 @@ module Combi
       waiter
     end
 
-    def respond(service_name, request, delivery_info)
+    def process_queue_message(service_name, request, delivery_info)
       message = Yajl::Parser.parse request, symbolize_keys: true
       kind = message[:kind]
       payload = message[:payload]
       options = message[:options]
       response = invoke_service(service_name, kind, payload)
-      response.callback do |service_response|
-        queue_service.respond service_response, delivery_info
-      end
-      response.errback do |service_response|
-        failure_response = { error: service_response }
-        queue_service.respond failure_response, delivery_info
+      if delivery_info.reply_to
+        response.callback do |service_response|
+          queue_service.respond service_response, delivery_info
+        end
+        response.errback do |service_response|
+          failure_response = { error: service_response }
+          queue_service.respond failure_response, delivery_info
+        end
       end
     end
 
