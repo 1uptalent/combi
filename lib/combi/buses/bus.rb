@@ -85,7 +85,7 @@ module Combi
         protected :service_module
 
         def remote_methods
-          @_REMOTE_METHODS ||= service_module.public_instance_methods(false) - [:actions]
+          @_REMOTE_METHODS ||= service_module.public_instance_methods(false) - Combi::Service.public_instance_methods]
         end
         def to_s
           @_TO_S ||= "#{service_module.name || 'Annonymous'}"
