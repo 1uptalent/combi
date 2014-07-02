@@ -46,6 +46,23 @@ describe 'Combi::WebSocket' do
     end
   end
 
+  context 'fire and forget' do
+    describe 'does not send a response' do
+      When(:service) { provider.add_service null_service }
+      Then do
+        em do
+          expect(provider).not_to receive(:send_response)
+          expect(service).to receive(:do_it) do
+            done
+            provider.stop!
+            consumer.stop!
+          end
+          prepare
+          consumer.request :null, :do_it, {}, fast: true
+        end
+      end
+    end
+  end
 
   context 'it notify when the connection is opened' do
     Then do

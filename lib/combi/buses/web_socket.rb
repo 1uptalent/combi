@@ -175,36 +175,41 @@ module Combi
         response = {error: {klass: e.class.name, message: e.message, backtrace: e.backtrace } }
       end
 
-      msg = {result: 'ok', correlation_id: message[:correlation_id]}
+      if message[:correlation_id]
+        # The client is insterested in a response
+        msg = {result: 'ok', correlation_id: message[:correlation_id]}
 
-      response.callback do |service_response|
-        msg[:response] = service_response
-        serialized = Yajl::Encoder.encode msg
-        ws.send serialized
-      end
-      response.errback do |service_response|
-        msg[:response] = {error: service_response}
-        serialized = Yajl::Encoder.encode msg
-        ws.send serialized
+        response.callback do |service_response|
+          msg[:response] = service_response
+          send_response ws, msg
+        end
+        response.errback do |service_response|
+          msg[:response] = {error: service_response}
+          send_response ws, msg
+        end
       end
     end
 
-    def request(name, kind, message, options = {})
-      options[:timeout] ||= RPC_DEFAULT_TIMEOUT
+    def send_response(ws, message)
+      serialized = Yajl::Encoder.encode message
+      ws.send serialized
+    end
+
+    def request(name, kind, message, timeout: RPC_DEFAULT_TIMEOUT, fast: false)
       msg = {
         service: name,
         kind: kind,
         payload: message
       }
-      if options[:fast]
+      if fast
         waiter = nil
       else
         correlation_id = Combi::Correlation.generate
         msg[:correlation_id] = correlation_id
-        waiter = @response_store.wait_for(correlation_id, options[:timeout])
+        waiter = @response_store.wait_for(correlation_id, timeout)
       end
       @ready.callback do |r|
-        web_socket = @machine.ws || options[:ws]
+        web_socket = @machine.ws
         unless web_socket.nil?
           serialized = Yajl::Encoder.encode msg
           log "sending request #{serialized}"
