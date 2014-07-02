@@ -94,8 +94,8 @@ module Combi
     end
 
     def respond(response, delivery_info)
-      response = response.call if response.respond_to? :call
-      publish response, routing_key: delivery_info.reply_to, correlation_id: delivery_info.correlation_id
+      serialized = Yajl::Encoder.encode response
+      publish serialized, routing_key: delivery_info.reply_to, correlation_id: delivery_info.correlation_id
     end
 
     def create_rpc_queue
@@ -103,9 +103,10 @@ module Combi
       @rpc_queue = queue('', exclusive: true, auto_delete: true) do |rpc_queue|
         log "\tRPC QUEUE: #{@rpc_queue.name}"
         rpc_queue.subscribe do |metadata, response|
+          parsed_response = Yajl::Parser.parse response, symbolize_keys: true
           message = {
-            'correlation_id' => metadata.correlation_id,
-            'response' => response
+            correlation_id: metadata.correlation_id,
+            response: parsed_response
           }
           rpc_callback.call(message) unless rpc_callback.nil?
         end
@@ -119,12 +120,8 @@ module Combi
       options[:expiration] = ((options[:timeout] || RPC_DEFAULT_TIMEOUT) * 1000).to_i
       options[:routing_key] ||= 'rcalls_queue'
       options[:reply_to] ||= @rpc_queue.name
-      request = {
-        kind: kind,
-        payload: message,
-        options: {}
-      }
-      publish(request.to_json, options)
+      request = Yajl::Encoder.encode kind: kind, payload: message, options: {}
+      publish request, options
     end
 
   end

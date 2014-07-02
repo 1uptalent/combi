@@ -36,7 +36,7 @@ describe "in a multi bus environment" do
               defer.fail('unknown error')
             end
           else
-            if service_result.respond_to?(:keys) && service_result['error']
+            if service_result.respond_to?(:keys) && service_result[:error]
               defer.fail('other service failed')
             else
               defer.succeed(service_result*2)
@@ -173,7 +173,7 @@ describe "in a multi bus environment" do
               prepare
               EM.synchrony do
                 service_result = EM::Synchrony.sync main_bus_consumer.request(:say_hello_if_you_can, :do_it, params, options)
-                service_result['error']['message'].should eq "I can't talk"
+                service_result[:error][:message].should eq "I can't talk"
                 done
                 finalize
               end
@@ -191,7 +191,7 @@ describe "in a multi bus environment" do
               EM.synchrony do
                 params.merge!('service_name' => 'say_hello_if_you_can')
                 service_result = EM::Synchrony.sync main_bus_consumer.request(:repeat_with_me, :do_it, params, options)
-                service_result['error'].should eq 'other service failed'
+                service_result[:error].should eq 'other service failed'
                 done
                 finalize
               end

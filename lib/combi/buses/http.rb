@@ -14,9 +14,9 @@ module Combi
       def on_message(request)
         path = request.path.split('/')
         message = {
-          "service" => path[1],
-          "kind" => path[2],
-          "payload" => JSON.parse(request.body)
+          service_name: path[1],
+          kind: path[2],
+          payload: Yajl::Parser.parse(request.body, symbolize_keys: true)
         }
         @bus.on_message(message)
       end
@@ -46,11 +46,8 @@ module Combi
       @machine.on_message Rack::Request.new(env)
     end
 
-    def on_message(message)
-      service_name = message['service']
-      kind = message['kind']
-      message['payload'] ||= {}
-      invoke_service(service_name, kind, message['payload'])
+    def on_message(service_name:, kind:, payload: {})
+      invoke_service(service_name, kind, payload)
     end
 
     def request(name, kind, message, options = {})
@@ -59,9 +56,10 @@ module Combi
       correlation_id = Combi::Correlation.generate
       waiter = @response_store.wait_for(correlation_id, options[:timeout])
       url = "#{@options[:remote_api]}#{name}/#{kind}"
-      request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message.to_json)
+      message_json = Yajl::Encoder.encode(message)
+      request_async = EventMachine::HttpRequest.new(url, connection_timeout: options[:timeout]).post(body: message_json)
       request_async.callback do |r|
-        parsed = JSON.parse(r.response)
+        parsed = Yajl::Parser.parse(r.response, symbolize_keys: true)
         waiter.succeed(parsed)
       end
       request_async.errback do |x|

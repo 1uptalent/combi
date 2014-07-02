@@ -65,17 +65,17 @@ module Combi
     end
 
     def respond(service_name, request, delivery_info)
-      message = JSON.parse request
-      kind = message['kind']
-      payload = message['payload']
-      options = message['options']
+      message = Yajl::Parser.parse request, symbolize_keys: true
+      kind = message[:kind]
+      payload = message[:payload]
+      options = message[:options]
       response = invoke_service(service_name, kind, payload)
       response.callback do |service_response|
-        queue_service.respond(service_response.to_json, delivery_info)
+        queue_service.respond service_response, delivery_info
       end
       response.errback do |service_response|
         failure_response = { error: service_response }
-        queue_service.respond(failure_response.to_json, delivery_info)
+        queue_service.respond failure_response, delivery_info
       end
     end
 
