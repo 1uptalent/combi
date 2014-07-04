@@ -18,12 +18,12 @@ module Combi
       end
 
       def on_open(ws, handler)
-        @bus.log "ON OPEN #{handler.inspect}"
+        Combi.logger.debug { "ON OPEN #{handler.inspect}" }
         handler.new_session(ws)
       end
 
       def on_message(ws, session, raw_message)
-        @bus.log "WS SERVER ON MESSAGE #{raw_message[0..500]}"
+        Combi.logger.debug {"WS SERVER ON MESSAGE #{raw_message[0..500]}"}
         message = Yajl::Parser.parse raw_message, symbolize_keys: true
         @bus.on_message(ws, message, session)
       end
@@ -49,7 +49,7 @@ module Combi
 
       def stop!
         ws && ws.close
-        @bus.log "stop requested"
+        Combi.logger.debug {"stop requested"}
       end
 
       def restart!
@@ -58,29 +58,28 @@ module Combi
       end
 
       def open_websocket
-        @bus.log  @remote_api
+        Combi.logger.debug { "Remote API #{@remote_api}" }
         @ws = ws = Faye::WebSocket::Client.new(@remote_api)
         ws.on :open do |event|
-          @bus.log "OPEN"
-          @bus.log "HANDLER #{@handler.inspect}"
+          Combi.logger.debug {"OPEN WITH HANDLER #{@handler.inspect}"}
           @handler.on_open if @handler.respond_to?(:on_open)
           @bus.ready.succeed
         end
 
         ws.on :message do |event|
-          @bus.log "ON MESSAGE: #{event.data[0..500]}"
+          Combi.logger.debug {"ON MESSAGE: #{event.data[0..500]}"}
           message = Yajl::Parser.parse event.data, symbolize_keys: true
           @bus.on_message(ws, message)
         end
 
         ws.on :close do |event|
-          @bus.log  "close #{event.code}: #{event.reason}"
+          Combi.logger.debug {"close #{event.code}: #{event.reason}"}
           @handler.on_close if @handler.respond_to?(:on_close)
           @ws = ws = nil
         end
 
         ws.on :error do |event|
-          @bus.log  "received error: #{event.inspect}"
+          Combi.logger.debug {"received error: #{event.inspect}"}
           stop!
         end
       end
@@ -157,7 +156,7 @@ module Combi
     def on_message(ws, message, session = nil)
       if message[:correlation_id] && message.has_key?(:result)
         @response_store.handle_rpc_response(message)
-        log "Handled response with correlation_id #{message[:correlation_id]} - #{message.inspect[0..500]}"
+        Combi.logger.debug {"Handled response with correlation_id #{message[:correlation_id]} - #{message.inspect[0..500]}"}
         return
       end
       service_name = message[:service]
@@ -207,7 +206,7 @@ module Combi
         web_socket = @machine.respond_to?(:ws) ? @machine.ws : ws
         unless web_socket.nil?
           serialized = Yajl::Encoder.encode msg
-          log "sending request #{serialized}"
+          Combi.logger.debug {"sending request #{serialized}"}
           web_socket.send serialized
         end
       end

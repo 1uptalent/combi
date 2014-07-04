@@ -26,11 +26,6 @@ class Combi::QueueService
     @amqp_conn && @amqp_conn.status
   end
 
-  def log(message)
-    return unless @debug_mode ||= ENV['DEBUG'] == 'true'
-    puts "#{Time.now.to_f} #{self.class.name} #{message}"
-  end
-
   def start
     @config[:reconnect_period] ||= 4
     reconnection_proc = Proc.new { EM.add_timer(@config[:reconnect_period] * rand) { start } }
@@ -46,21 +41,21 @@ class Combi::QueueService
   end
 
   def connect(config, &after_connect)
-    puts "[INFO] trying to connect to queue server"
+    Combi.logger.info {"trying to connect to queue server"}
     @amqp_conn = AMQP.connect(config) do |connection, open_ok|
       @channel = AMQP::Channel.new @amqp_conn
       @channel.auto_recovery = true
       @exchange = @channel.direct ''
       after_connect.call
       connection.on_error do |conn, connection_close|
-        puts "[amqp connection.close] Reply code = #{connection_close.reply_code}, reply text = #{connection_close.reply_text}"
+        Combi.logger.info {"[amqp connection.close] Reply code = #{connection_close.reply_code}, reply text = #{connection_close.reply_text}"}
         if connection_close.reply_code == 320
-          puts "[amqp connection.close] Setting up a periodic reconnection timer..."
+          Combi.logger.info {"[amqp connection.close] Setting up a periodic reconnection timer..."}
           reconnect
         end
       end
       connection.on_tcp_connection_loss do |conn, settings|
-        puts "[ERROR] Connection failed, resetting for reconnect"
+        Combi.logger.error {"Connection failed, resetting for reconnect"}
         reconnect
       end
     end
@@ -100,7 +95,7 @@ class Combi::QueueService
   def create_rpc_queue
     @rpc_queue.unsubscribe unless @rpc_queue.nil?
     @rpc_queue = queue('', exclusive: true, auto_delete: true) do |rpc_queue|
-      log "\tRPC QUEUE: #{@rpc_queue.name}"
+      Combi.logger.debug {"\tRPC QUEUE: #{@rpc_queue.name}"}
       rpc_queue.subscribe do |metadata, response|
         parsed_response = Yajl::Parser.parse response, symbolize_keys: true
         message = {
@@ -119,7 +114,7 @@ class Combi::QueueService
       options[:reply_to] = @rpc_queue.name
     end
     options[:expiration] = ((options[:timeout] || RPC_DEFAULT_TIMEOUT) * 1000).to_i
-    log "sending request #{kind} #{message.inspect[0..500]} with options #{options.inspect}"
+    Combi.logger.debug {"sending request #{kind} #{message.inspect[0..500]} with options #{options.inspect}"}
     request = Yajl::Encoder.encode kind: kind, payload: message, options: {}
     publish request, options
   end

@@ -55,11 +55,6 @@ module Combi
       end
     end
 
-    def log(message)
-      return unless @debug_mode ||= ENV['DEBUG'] == 'true'
-      puts "#{Time.now.to_f} #{self.class.name} #{message}"
-    end
-
     protected
 
     def make_service_instance(service_definition)
@@ -98,7 +93,7 @@ module Combi
 
     def add_route_for(service_name, action_name, service_instance)
       path = [service_name, action_name].join('/')
-      puts "New route: #{path} :: #{service_instance}"
+      Combi.logger.info {"New route: #{path} :: #{service_instance}"}
       @routes[path] = service_instance
     end
 
@@ -112,8 +107,8 @@ module Combi
     def resolve_route(service_name, kind)
       path = [service_name, kind].join('/')
       return @routes[path] if @routes[path]
-      log "[WARNING] Service Path #{path} not found"
-      log "[WARNING] routes: #{@routes.keys.inspect}"
+      Combi.logger.warn {"Service Path #{path} not found"}
+      Combi.logger.warn {"routes: #{@routes.keys.inspect}"}
       raise UnknownStop.new(path)
     end
 
@@ -128,14 +123,14 @@ module Combi
       deferrable.errback &log_service_invocation(false, t0, path)
       deferrable
     rescue StandardError => e
-      # TODO: report in a more effective way (I will not read server logs to find this)
-      require 'yaml'
-      puts " *** ERROR INVOKING SERVICE ***"
-      puts "   - #{e.inspect}"
-      puts "   - #{service_name} #{service_instance.class.ancestors.join ' > '}"
-      puts "   - #{action}"
-      puts "   - #{params.to_yaml.split("\n").join("\n\t")}"
-      # FIXME: strings because is what in_process tests expects
+      Combi.logger.error do
+        require 'yaml'
+        msg = " *** ERROR INVOKING SERVICE ***" +
+              "   - #{e.inspect}" +
+              "   - #{service_name} #{service_instance.class.ancestors.join ' > '}" +
+              "   - #{action}" +
+              "   - #{params.to_yaml.split("\n").join("\n\t")}"
+      end
       return sync_to_async error: { klass: e.class.name, message: e.message, backtrace: e.backtrace }
     end
 
@@ -152,11 +147,13 @@ module Combi
 
     def log_service_invocation(success, t0, path)
       Proc.new do |response|
-        result = success ? 'OK' : 'KO'
-        time = '%10.6fs' % (Time.now - t0)
-        base_msg = "#{result}\t#{time}\t#{path}"
-        base_msg += "\t#{response.inspect}" if success == false
-        puts base_msg
+        Combi.logger.info do
+          result = success ? 'OK' : 'KO'
+          time = '%10.6fs' % (Time.now - t0)
+          base_msg = "#{result}\t#{time}\t#{path}"
+          base_msg += "\t#{response.inspect}" if success == false
+          base_msg
+        end
       end
     end
 

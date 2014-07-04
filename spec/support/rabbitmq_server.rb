@@ -1,6 +1,7 @@
 require 'singleton'
 require 'socket'
 require 'timeout'
+require 'combi'
 # Uses docker to start a server
 class RabbitmqServer
   include Singleton
@@ -11,9 +12,9 @@ class RabbitmqServer
   def start!
     needs_to_start = !container_running?
     if needs_to_start
-      puts "Starting new Rabbitmq container"
+      Combi.logger.debug {"Starting new Rabbitmq container"}
       system "docker run -d -P -e RABBITMQ_PASS=#{PASSWORD} --name #{NAME} tutum/rabbitmq"
-      puts "RABBITMQ STARTING"
+      Combi.logger.debug {"RABBITMQ STARTING"}
     end
     start_forwarder!
     is_port_open?('localhost', port)
@@ -32,11 +33,11 @@ class RabbitmqServer
     return if @_command_running ||= `ps`.include?(command)
     @forwarder_pid = Process.spawn command
     #Process.detach @forwarder_pid
-    puts "starting forwarder pid: #{@forwarder_pid}"
+    Combi.logger.debug {"starting forwarder pid: #{@forwarder_pid}"}
   end
 
   def stop_forwarder!
-    puts "stopping forwarder pid #{@forwarder_pid}"
+    Combi.logger.debug {"stopping forwarder pid #{@forwarder_pid}"}
     Process.kill 'TERM', @forwarder_pid if @forwarder_pid
   rescue Error::ESRCH => e
     # the forwarder process has already died
@@ -48,7 +49,7 @@ class RabbitmqServer
     if port_match
       return port_match[1].to_i
     else
-      puts "Container not running yet, sleeping"
+      Combi.logger.info {"Container not running yet, sleeping"}
       sleep 0.2
       port
     end
@@ -63,14 +64,13 @@ class RabbitmqServer
           s.close
           return true
         rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
-          puts "conn error to #{service}"
           sleep 1
-          puts "\tretrying connection to #{service}"
+          Combi.logger.info {"\tretrying connection to #{service}"}
           retry
         end
       end
     rescue Timeout::Error
-      puts "Cannot connect to RABBIT server after #{timeout} seconds"
+      Combi.logger.error {"Cannot connect to RABBIT server after #{timeout} seconds"}
     end
 
     return false

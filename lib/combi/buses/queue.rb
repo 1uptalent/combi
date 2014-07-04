@@ -31,13 +31,13 @@ module Combi
     end
 
     def create_queue_for_service(service_name)
-      log "creating queue #{service_name}"
+      Combi.logger.debug {"creating queue #{service_name}"}
       queue_options = {}
       subscription_options = {}
       subscription_options[:ack] = true
       queue_service.ready do
         queue_service.queue(service_name.to_s, queue_options) do |queue|
-          log "subscribing to queue #{service_name.to_s}"
+          Combi.logger.debug {"subscribing to queue #{service_name.to_s}"}
           queue.subscribe(subscription_options) do |delivery_info, payload|
             process_queue_message service_name, payload, delivery_info
             queue_service.acknowledge delivery_info
@@ -47,7 +47,7 @@ module Combi
     end
 
     def request(name, kind, message, timeout: RPC_DEFAULT_TIMEOUT, fast: false)
-      log "Preparing request: #{name}.#{kind} #{message.inspect[0..500]}\t|| timeout: #{timeout} fast: #{fast}"
+      Combi.logger.debug {"Preparing request: #{name}.#{kind} #{message.inspect[0..500]}\t|| timeout: #{timeout} fast: #{fast}"}
       options = {
         timeout: timeout,
         routing_key: name.to_s
@@ -60,7 +60,7 @@ module Combi
         waiter = @response_store.wait_for correlation_id, timeout
       end
       queue_service.next_ready_only do
-        log "Making request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect[0..500]}"
+        Combi.logger.debug {"Making request: #{name}.#{kind} #{message.inspect[0..500]}\t|| #{options.inspect[0..500]}"}
         queue_service.publish_request(kind, message, options)
       end
       waiter
