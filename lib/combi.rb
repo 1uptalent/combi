@@ -5,8 +5,12 @@ module Combi
     @logger ||= create_logger
   end
 
-  def self.logger=(logger)
-    @logger = logger
+  def self.logger_class
+    @logger_class ||= Logger
+  end
+
+  def self.logger_class=(custom_class)
+    @logger_class = custom_class
   end
 
   protected
@@ -21,7 +25,7 @@ module Combi
     else
       severity = Logger::Severity::INFO
     end
-    logger = Logger.new(STDOUT)
+    logger = logger_class.new(STDOUT)
     logger.level = severity
     return logger
   end
