@@ -28,11 +28,7 @@ describe 'Combi::Bus' do
         end
       end
       Given(:path) { 'module/remote' }
-      When { bus.add_service service_definition
-        puts bus.routes.inspect
-        puts bus.routes[path].inspect
-        puts bus.routes.keys.inspect
-      }
+      When { bus.add_service service_definition }
       Then { bus.routes.keys.length == 1 }
       And  { bus.routes[path].is_a? service_definition }
     end

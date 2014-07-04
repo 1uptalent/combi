@@ -68,7 +68,7 @@ describe 'Combi::Queue' do
   end
 
   context "it resist a reconnection" do
-    puts "VERY UNSTABLE TEST"
+    Given!("notice") { puts "VERY UNSTABLE TEST" }
     When(:service) { provider.add_service null_service }
     Then do
       em do
