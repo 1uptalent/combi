@@ -83,7 +83,7 @@ Combi::Reactor.join_thread
 
 ## Testing
 
-`rspec`, the integration suite, test services requesting other services through other buses (compisition).
+`rspec`, the integration suite, test services requesting other services through other buses (composition).
 
 For AMQP buses, a RabbitMQ server is required. We provide a setup/teardown based in docker.
 
